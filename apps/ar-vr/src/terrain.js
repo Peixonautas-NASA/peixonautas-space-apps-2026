@@ -284,6 +284,7 @@ async function buildChunk(world, tileX, tileY, exag, onProgress) {
     tileY,
     heightAt,
     setExag,
+    colorCanvas, // mosaico Viking do bloco (usado pelos mapas em miniatura)
     bounds: { minX: nw.x, maxX: se.x, minZ: nw.z, maxZ: se.z },
     dispose() {
       geometry.dispose();

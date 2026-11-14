@@ -182,6 +182,7 @@ export function buildRoute(terrain, pts2d, destName = 'Destino') {
 
   return {
     group,
+    path, // pontos a cada ~1 m com distância acumulada (.d), usados pelo piloto automático e pelos mapas
     total,
     dest,
     aim: path.find((p) => p.d >= 25) ?? dest, // ponto ~25 m à frente na rota

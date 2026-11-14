@@ -15,10 +15,12 @@
   <title>Peixonautas · Visão VR</title>
   <style>
     :root {
-      --sl: max(10px, env(safe-area-inset-left));
-      --sr: max(10px, env(safe-area-inset-right));
-      --st: max(8px, env(safe-area-inset-top));
-      --sb: max(8px, env(safe-area-inset-bottom));
+      --sl: max(8px, env(safe-area-inset-left));
+      --sr: max(8px, env(safe-area-inset-right));
+      --st: max(6px, env(safe-area-inset-top));
+      --sb: max(6px, env(safe-area-inset-bottom));
+      --glass: rgba(12, 20, 28, 0.48);
+      --line: rgba(220, 240, 255, 0.18);
     }
     html, body { margin: 0; height: 100%; overflow: hidden; background: #05070a; color: #e6edf3;
       font-family: system-ui, -apple-system, sans-serif; -webkit-user-select: none; user-select: none;
@@ -26,89 +28,98 @@
     #app, #app canvas { position: fixed; inset: 0; display: block; }
 
     button { font: inherit; font-weight: 600; color: #e6edf3; cursor: pointer; touch-action: manipulation;
-      border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(13, 17, 23, 0.62);
-      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
-    button:active { transform: scale(0.96); }
+      border: 1px solid var(--line); background: var(--glass);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+    button:active { transform: scale(0.95); }
+    svg { width: 17px; height: 17px; fill: currentColor; display: block; }
+    svg.stroke, .stroke svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
-    /* ---------- Layout PAISAGEM (modo principal) ---------- */
-    /* Canto superior esquerdo: ferramentas em ícones */
-    #tools { position: fixed; top: var(--st); left: var(--sl); display: flex; gap: 8px; z-index: 5; }
-    .icon { width: 44px; height: 44px; border-radius: 12px; font-size: 20px; padding: 0; display: grid; place-items: center; }
-    .icon.on { background: rgba(35, 134, 54, 0.75); border-color: #2ea043; }
+    /* ---------- HUD enxuto (paisagem é o modo principal) ---------- */
+    /* Canto superior esquerdo: ferramentas */
+    #tools { position: fixed; top: var(--st); left: var(--sl); display: flex; gap: 6px; z-index: 5; }
+    .icon { width: 34px; height: 34px; border-radius: 10px; padding: 0; display: grid; place-items: center; opacity: 0.85; }
+    .icon.on { color: #9bf0ff; border-color: rgba(62, 230, 255, 0.6); background: rgba(20, 70, 90, 0.55); opacity: 1; }
     .icon[hidden] { display: none; }
 
-    /* Topo central: informações da rota */
+    /* Topo central: rota em uma linha + linha fina de dados */
     #hud { position: fixed; top: var(--st); left: 50%; transform: translateX(-50%); display: flex; flex-direction: column;
-      align-items: center; gap: 4px; pointer-events: none; z-index: 4; max-width: 46vw; }
-    .pill { background: rgba(8, 14, 22, 0.66); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 999px;
-      padding: 5px 12px; font-size: 13px; white-space: nowrap; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
-    #hudDest { color: #9bf0ff; font-weight: 600; }
-    #hudInfo { font-size: 11px; color: #c9d1d9; }
-    #hudSource { font-size: 10px; color: #8b949e; text-shadow: 0 1px 2px #000; }
+      align-items: center; gap: 3px; pointer-events: none; z-index: 4; max-width: 50vw; }
+    #hudDest { background: var(--glass); border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px;
+      font-size: 12px; font-weight: 600; color: #9bf0ff; white-space: nowrap;
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+    #hudInfo { font-size: 10px; color: rgba(230, 240, 250, 0.8); white-space: nowrap; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); }
 
-    /* Polegar direito: andar. Polegar esquerdo: velocidade e recentralizar */
-    #walkBtn { position: fixed; right: calc(var(--sr) + 8px); bottom: calc(var(--sb) + 8px); width: 104px; height: 104px;
-      border-radius: 50%; font-size: 17px; line-height: 1.15; background: rgba(31, 111, 235, 0.72); border: 2px solid #58a6ff;
-      z-index: 5; touch-action: none; }
-    #walkBtn.active { background: #3ee6ff; color: #04212a; transform: scale(1.07); }
-    #leftPad { position: fixed; left: calc(var(--sl) + 8px); bottom: calc(var(--sb) + 8px); display: flex; flex-direction: column;
-      gap: 10px; z-index: 5; }
-    #leftPad button { border-radius: 999px; padding: 11px 14px; font-size: 14px; min-width: 120px; }
+    /* Canto inferior esquerdo: caminhada */
+    #leftPad { position: fixed; left: var(--sl); bottom: var(--sb); display: flex; gap: 6px; z-index: 5; align-items: center; }
+    #speedBtn { height: 34px; border-radius: 10px; padding: 0 10px; font-size: 12px; opacity: 0.85; }
 
-    #crosshair { position: fixed; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%;
-      background: rgba(255, 255, 255, 0.75); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4); pointer-events: none; z-index: 3; }
+    /* Canto inferior direito: seletor discreto dos widgets */
+    #widgetBar { position: fixed; right: var(--sr); bottom: var(--sb); display: flex; z-index: 5; border-radius: 10px;
+      border: 1px solid var(--line); background: var(--glass); overflow: hidden;
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+    #widgetBar button { border: 0; background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none;
+      height: 32px; padding: 0 10px; font-size: 11px; font-weight: 600; color: rgba(230, 240, 250, 0.55);
+      display: flex; align-items: center; gap: 5px; }
+    #widgetBar button + button { border-left: 1px solid var(--line); }
+    #widgetBar button.on { color: #9bf0ff; }
+    #widgetBar button .dot { width: 6px; height: 6px; border-radius: 50%; border: 1px solid currentColor; }
+    #widgetBar button.on .dot { background: currentColor; box-shadow: 0 0 6px currentColor; }
 
-    #settings { position: fixed; top: calc(var(--st) + 52px); left: var(--sl); width: min(300px, 70vw);
-      max-height: calc(100% - var(--st) - var(--sb) - 64px); overflow-y: auto; -webkit-overflow-scrolling: touch;
-      background: rgba(22, 27, 34, 0.94); border: 1px solid #30363d; border-radius: 12px; padding: 12px; font-size: 13px;
-      display: none; z-index: 8; touch-action: pan-y; }
+    #crosshair { position: fixed; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%;
+      background: rgba(255, 255, 255, 0.6); pointer-events: none; z-index: 3; }
+
+    #settings { position: fixed; top: calc(var(--st) + 42px); left: var(--sl); width: min(280px, 70vw);
+      max-height: calc(100% - var(--st) - var(--sb) - 54px); overflow-y: auto; -webkit-overflow-scrolling: touch;
+      background: rgba(16, 22, 30, 0.9); border: 1px solid var(--line); border-radius: 12px; padding: 12px; font-size: 12px;
+      display: none; z-index: 8; touch-action: pan-y; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
     #settings.open { display: block; }
     #settings label { display: block; margin-top: 8px; }
-    #settings input[type="range"] { width: 100%; accent-color: #58a6ff; }
-    #settings select { width: 100%; margin-top: 4px; padding: 8px; border-radius: 8px; background: #0d1117; color: #e6edf3;
+    #settings input[type="range"] { width: 100%; accent-color: #3ee6ff; }
+    #settings select { width: 100%; margin-top: 4px; padding: 7px; border-radius: 8px; background: #0d1117; color: #e6edf3;
       border: 1px solid #30363d; font: inherit; }
-    #settings button.small { width: 100%; margin-top: 6px; padding: 7px; font-size: 12px; border-radius: 8px; background: #1f6feb; }
+    #settings button.small { width: 100%; margin-top: 6px; padding: 6px; font-size: 11px; border-radius: 8px; }
     #settings label.check { display: flex; gap: 8px; align-items: center; }
     #settings p { margin: 8px 0 0; color: #8b949e; font-size: 11px; line-height: 1.4; }
 
-    /* Retrato num celular: ainda funciona, mas pede para girar */
     @media (orientation: portrait) {
-      #hud { top: calc(var(--st) + 54px); max-width: 92vw; }
-      #walkBtn { width: 92px; height: 92px; }
+      #hud { top: calc(var(--st) + 42px); max-width: 92vw; }
     }
 
     /* ---------- Telas sobrepostas ---------- */
     .overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
       gap: 12px; text-align: center; padding: 24px calc(var(--sr) + 16px) 24px calc(var(--sl) + 16px); z-index: 20; }
     .overlay[hidden] { display: none; }
-    .overlay h1 { margin: 0; font-size: 22px; color: #58a6ff; }
-    .overlay p { margin: 0; color: #c9d1d9; font-size: 14px; max-width: 520px; line-height: 1.45; }
+    .overlay h1 { margin: 0; font-size: 20px; font-weight: 600; color: #9bf0ff; }
+    .overlay p { margin: 0; color: #c9d1d9; font-size: 13px; max-width: 520px; line-height: 1.45; }
     .overlay .muted { color: #8b949e; font-size: 12px; }
     #loading { background: #0d1117; transition: opacity 0.4s; }
     #loading.hidden { opacity: 0; pointer-events: none; }
-    #start { background: rgba(5, 7, 10, 0.72); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
-    #startBtn { font-size: 18px; padding: 16px 28px; border-radius: 999px; background: #238636; border: 2px solid #2ea043; }
-    #startPlain { font-size: 13px; padding: 8px 14px; border-radius: 999px; }
-    .rotateIcon { font-size: 46px; animation: rot 2.2s ease-in-out infinite; }
+    #start { background: rgba(5, 7, 10, 0.7); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+    #startBtn { font-size: 16px; padding: 12px 26px; border-radius: 999px; background: rgba(20, 90, 110, 0.75);
+      border-color: rgba(62, 230, 255, 0.7); display: flex; align-items: center; gap: 8px; }
+    #startPlain { font-size: 12px; padding: 7px 12px; border-radius: 999px; }
+    .rotateIcon { width: 44px; height: 44px; animation: rot 2.2s ease-in-out infinite; color: #c9d1d9; }
+    .rotateIcon svg { width: 44px; height: 44px; }
     @keyframes rot { 0%, 25% { transform: rotate(0deg); } 55%, 100% { transform: rotate(-90deg); } }
-    #rotateHint { display: none; }
-    @media (orientation: portrait) and (pointer: coarse) { #rotateHint { display: block; } }
+    #rotateHint { display: none; flex-direction: column; align-items: center; gap: 8px; }
+    @media (orientation: portrait) and (pointer: coarse) { #rotateHint { display: flex; } }
 
     #rotateOverlay { background: rgba(5, 7, 10, 0.9); z-index: 15; }
     #installSheet { background: rgba(5, 7, 10, 0.92); z-index: 25; }
-    #installSheet ol { text-align: left; margin: 0; padding-left: 22px; color: #e6edf3; font-size: 15px; line-height: 1.7; }
-    #installSheet button, #rotateOverlay button { padding: 10px 18px; border-radius: 999px; }
+    #installSheet ol { text-align: left; margin: 0; padding-left: 22px; color: #e6edf3; font-size: 14px; line-height: 1.7; }
+    #installSheet button, #rotateOverlay button { padding: 9px 16px; border-radius: 999px; font-size: 13px; }
 
-    #toast { position: fixed; left: 50%; bottom: calc(var(--sb) + 12px); transform: translateX(-50%); max-width: 56vw;
-      background: rgba(158, 106, 3, 0.95); color: #fff; padding: 9px 14px; border-radius: 10px; font-size: 13px;
-      opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 30; text-align: center; }
+    #toast { position: fixed; left: 50%; bottom: calc(var(--sb) + 44px); transform: translateX(-50%); max-width: 56vw;
+      background: rgba(12, 20, 28, 0.82); border: 1px solid var(--line); color: #e6f6ff; padding: 7px 12px;
+      border-radius: 10px; font-size: 12px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 30;
+      text-align: center; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
     #toast.show { opacity: 1; }
 
     /* Modo estéreo: só a cena e um botão discreto para sair */
     #exitStereo { display: none; position: fixed; top: 6px; left: 50%; transform: translateX(-50%); z-index: 10;
-      padding: 5px 10px; font-size: 12px; border-radius: 999px; opacity: 0.55; }
+      padding: 4px 10px; font-size: 11px; border-radius: 999px; opacity: 0.55; }
     body.stereo #exitStereo { display: block; }
-    body.stereo #tools, body.stereo #hud, body.stereo #walkBtn, body.stereo #leftPad,
+    body.stereo #tools, body.stereo #hud, body.stereo #leftPad, body.stereo #widgetBar,
     body.stereo #settings, body.stereo #crosshair { display: none !important; }
   </style>
 </head>
@@ -116,23 +127,37 @@
   <div id="app"></div>
 
   <div id="tools">
-    <button class="icon" id="fullscreenBtn" title="Tela cheia" aria-label="Tela cheia">⛶</button>
-    <button class="icon" id="sensorsBtn" title="Sensores de movimento" aria-label="Sensores">🧭</button>
-    <button class="icon" id="stereoBtn" title="Modo estéreo (Cardboard)" aria-label="Estéreo">👓</button>
-    <button class="icon" id="settingsBtn" title="Ajustes" aria-label="Ajustes">⚙</button>
+    <button class="icon stroke" id="fullscreenBtn" title="Tela cheia" aria-label="Tela cheia">
+      <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+    </button>
+    <button class="icon stroke" id="sensorsBtn" title="Sensores de movimento" aria-label="Sensores">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="m15.5 8.5-2.3 4.7-4.7 2.3 2.3-4.7z" /></svg>
+    </button>
+    <button class="icon stroke" id="stereoBtn" title="Modo estéreo (Cardboard)" aria-label="Estéreo">
+      <svg viewBox="0 0 24 24"><path d="M3 7.5h18v9h-6l-1.6-2.6a1.6 1.6 0 0 0-2.8 0L9 16.5H3z" /><circle cx="7.5" cy="12" r="1.6" /><circle cx="16.5" cy="12" r="1.6" /></svg>
+    </button>
+    <button class="icon stroke" id="settingsBtn" title="Ajustes" aria-label="Ajustes">
+      <svg viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9" /><circle cx="15" cy="7" r="2" /><circle cx="9" cy="17" r="2" /></svg>
+    </button>
   </div>
 
   <div id="hud">
-    <div class="pill" id="hudDest">Carregando rota…</div>
-    <div class="pill" id="hudInfo">Rumo —</div>
-    <div id="hudSource">—</div>
+    <div id="hudDest">Carregando rota…</div>
+    <div id="hudInfo">—</div>
   </div>
 
   <div id="leftPad">
-    <button id="speedBtn" title="Velocidade">🚶 1,4 m/s</button>
-    <button id="recenterBtn" title="Apontar para a rota">🎯 Rota</button>
+    <button class="icon" id="playBtn" title="Pausar caminhada" aria-label="Pausar caminhada"></button>
+    <button id="speedBtn" title="Velocidade">1,4 m/s</button>
+    <button class="icon stroke" id="recenterBtn" title="Olhar para a rota" aria-label="Olhar para a rota">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" /><circle cx="12" cy="12" r="2.5" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>
+    </button>
   </div>
-  <button id="walkBtn" aria-label="Andar (segure)">⬆<br />Andar</button>
+
+  <div id="widgetBar" role="group" aria-label="Widgets">
+    <button id="map2dBtn" title="Mostrar ou esconder o Mapa 2D"><span class="dot"></span>Mapa 2D</button>
+    <button id="map3dBtn" title="Mostrar ou esconder o Mapa 3D"><span class="dot"></span>Mapa 3D</button>
+  </div>
 
   <div id="settings">
     <strong>Ajustes</strong>
@@ -147,29 +172,36 @@
       <input type="range" id="smoothSlider" min="1" max="30" step="1" value="10" />
     </label>
     <label class="check"><input type="checkbox" id="detailToggle" checked /> Textura de detalhe perto dos pés</label>
-    <p>Segure ⬆ Andar para caminhar para onde você olha. 🎯 Rota aponta você de volta para o caminho.</p>
+    <p>O astronauta segue a rota sozinho. O botão de pausa para e retoma; ao chegar, ele vira "recomeçar". O alvo
+      vira o olhar para a rota.</p>
+    <p>Mapas: arraste pela barra de título para mudar de lugar (eles ficam sempre à mesma distância de você). No Mapa 3D,
+      arraste a maquete para girar. O X fecha; o seletor no canto inferior direito reabre à sua frente.</p>
     <p>Sensores: menor = mais suave (menos tremor, mais atraso). Com sensores ligados, arrastar a tela ajusta só o rumo.</p>
-    <p>PC: W/A/S/D ou setas para andar, Shift = 5x mais rápido.</p>
+    <p>PC: espaço pausa; W/A/S/D ou setas andam livre; Shift = 5x mais rápido.</p>
+    <p id="hudSource">—</p>
     <p>Relevo: mesmo do mapa 3D (cromaticidade do MOLA ClrShade, -8,2 a +21,2 km). A textura de detalhe é procedural.</p>
   </div>
 
   <div id="crosshair"></div>
-  <button id="exitStereo">✕ sair do estéreo</button>
+  <button id="exitStereo">Sair do estéreo</button>
   <div id="toast"></div>
 
   <!-- Tela de entrada: um toque liga tela cheia + horizontal + sensores -->
   <div id="start" class="overlay" hidden>
     <h1>Peixonautas · Visão VR</h1>
     <p id="startPlace">—</p>
-    <div id="rotateHint"><div class="rotateIcon">📱</div><p>Gire o celular para a <b>horizontal</b>.</p></div>
-    <button id="startBtn">▶ Entrar</button>
+    <div id="rotateHint">
+      <div class="rotateIcon stroke"><svg viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2" /><path d="M11 18.5h2" /></svg></div>
+      <p>Gire o celular para a <b>horizontal</b>.</p>
+    </div>
+    <button id="startBtn"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z" /></svg>Entrar</button>
     <p class="muted" id="startNote">Entra em tela cheia, na horizontal, com os sensores de movimento.</p>
     <button id="startPlain">continuar sem tela cheia</button>
   </div>
 
   <!-- Celular em pé: pede para deitar -->
   <div id="rotateOverlay" class="overlay" hidden>
-    <div class="rotateIcon">📱</div>
+    <div class="rotateIcon stroke"><svg viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2" /><path d="M11 18.5h2" /></svg></div>
     <h1>Deite o celular</h1>
     <p>A Visão VR foi feita para usar na <b>horizontal</b>.</p>
     <button id="rotateDismiss">usar na vertical mesmo assim</button>
@@ -180,7 +212,7 @@
     <h1>Tela cheia no iPhone</h1>
     <p>O Safari só abre em tela cheia quando a página está instalada como app:</p>
     <ol>
-      <li>Toque em <b>Compartilhar</b> <span aria-hidden="true">(□↑)</span> na barra do Safari;</li>
+      <li>Toque em <b>Compartilhar</b> (quadrado com seta para cima) na barra do Safari;</li>
       <li>Escolha <b>Adicionar à Tela de Início</b> → <b>Adicionar</b>;</li>
       <li>Abra pelo ícone <b>Peixonautas VR</b> e deite o celular.</li>
     </ol>
