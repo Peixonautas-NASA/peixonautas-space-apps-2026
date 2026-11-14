@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Peixonautas — Relevo 3D Marciano com LOD Dinâmico</title>
+  <style>
+    body { margin: 0; font-family: system-ui, -apple-system, sans-serif; display: flex; height: 100vh; background: #0d1117; color: #e6edf3; overflow: hidden; }
+    #sidebar { width: 340px; padding: 16px; background: #161b22; border-right: 1px solid #30363d; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; z-index: 10; }
+    #canvasContainer { flex: 1; position: relative; background: #05070a; }
+    h2 { margin: 0 0 4px 0; font-size: 18px; color: #58a6ff; }
+    .subtitle { font-size: 12px; color: #8b949e; }
+    .card { background: #21262d; padding: 12px; border-radius: 8px; border: 1px solid #30363d; font-size: 13px; }
+    .badge { font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #1f6feb; color: #fff; display: inline-block; margin-top: 6px; }
+    .badge.hirise { background: #238636; }
+    .badge.interp { background: #9e6a03; }
+    label { display: block; font-size: 12px; color: #c9d1d9; margin-top: 8px; }
+    input[type="number"], button { width: 100%; padding: 8px; margin-top: 4px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: #fff; box-sizing: border-box; }
+    input[type="range"] { width: 100%; margin-top: 4px; accent-color: #58a6ff; }
+    button { background: #238636; border: none; font-weight: 600; cursor: pointer; margin-top: 8px; }
+    button:hover { background: #2ea043; }
+    .preset-btn { background: #30363d; font-weight: 500; margin-top: 6px; }
+    .preset-btn:hover { background: #484f58; }
+    .preview-row { display: flex; gap: 8px; margin-top: 8px; }
+    .preview-box { flex: 1; text-align: center; font-size: 11px; color: #8b949e; }
+    .preview-box canvas { width: 100%; height: auto; border-radius: 4px; border: 1px solid #30363d; background: #0d1117; }
+    #hudOverlay {
+      position: absolute; top: 14px; right: 14px; background: rgba(22, 27, 34, 0.88);
+      border: 1px solid #30363d; border-radius: 8px; padding: 10px 14px; font-size: 12px;
+      pointer-events: none; backdrop-filter: blur(4px); line-height: 1.5;
+    }
+    #status { font-size: 11px; color: #8b949e; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <div>
+      <h2>Relevo 3D Marciano</h2>
+      <div class="subtitle">LOD Dinâmico no Zoom (Viking + MOLA + HiRISE)</div>
+    </div>
+
+    <div class="card">
+      <strong>Navegar para Coordenada</strong>
+      <label>Latitude (-90 a 90):</label>
+      <input type="number" id="latInput" step="0.01" value="18.40" />
+      <label>Longitude (-180 a 180):</label>
+      <input type="number" id="lonInput" step="0.01" value="77.50" />
+      <button onclick="jumpToInput()">Centralizar Ponto</button>
+
+      <button class="preset-btn" onclick="jumpTo(18.40, 77.50, 14)">Cratera Jezero (Zoom até HiRISE)</button>
+      <button class="preset-btn" onclick="jumpTo(-13.90, -59.20, 36)">Valles Marineris (Cânion)</button>
+      <button class="preset-btn" onclick="jumpTo(18.65, -133.80, 42)">Olympus Mons (Vulcão)</button>
+      <button class="preset-btn" onclick="jumpTo(-4.59, 137.44, 18)">Cratera Gale (Monte Sharp)</button>
+      <div id="status">Use o scroll do mouse para aumentar a resolução.</div>
+    </div>
+
+    <div class="card">
+      <strong>Controles de Relevo e Sol</strong>
+      <label>Exagero Vertical: <span id="dispVal">1.6x</span></label>
+      <input type="range" id="dispSlider" min="0" max="5" step="0.1" value="1.6" />
+
+      <label>Intensidade do Normal Map: <span id="normVal">2.4</span></label>
+      <input type="range" id="normSlider" min="0" max="5" step="0.1" value="2.4" />
+
+      <label>Azimute Solar: <span id="sunAzVal">45°</span></label>
+      <input type="range" id="sunAzSlider" min="0" max="360" step="1" value="45" />
+
+      <label>Elevação Solar: <span id="sunElVal">30°</span></label>
+      <input type="range" id="sunElSlider" min="5" max="85" step="1" value="30" />
+
+      <div id="sourceBadge" class="badge">Observação Orbital Global (Viking + MOLA)</div>
+    </div>
+
+    <div class="card">
+      <strong>Texturas Ativas no Zoom Atual</strong>
+      <div class="preview-row">
+        <div class="preview-box">
+          <canvas id="colorPreview" width="128" height="128"></canvas>
+          <div>Cor (Alvo Atual)</div>
+        </div>
+        <div class="preview-box">
+          <canvas id="normalPreview" width="128" height="128"></canvas>
+          <div>Normal Map (Sobel)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="canvasContainer">
+    <div id="hudOverlay">
+      <div><strong>Foco:</strong> <span id="hudCoords">18.40°N, 77.50°E</span></div>
+      <div><strong>Nível LOD (WMTS):</strong> Zoom <span id="hudZoom">6</span> / 12</div>
+      <div><strong>Fonte:</strong> <span id="hudSource">Viking 232m + MOLA 463m</span></div>
+    </div>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const container = document.getElementById('canvasContainer');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x06080c);
+
+    // Escala espacial: 1 grau planetário = 10 unidades no mundo 3D
+    const DEG_TO_WORLD = 10.0;
+    let anchorLat = 18.40;
+    let anchorLon = 77.50;
+
+    const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.02, 1000);
+    camera.position.set(0, 14, 16);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.07;
+    controls.maxPolarAngle = Math.PI * 0.49;
+    controls.minDistance = 0.25;
+    controls.maxDistance = 140;
+
+    // Iluminação
+    const ambientLight = new THREE.AmbientLight(0xffd6ba, 0.28);
+    scene.add(ambientLight);
+
+    const sunLight = new THREE.DirectionalLight(0xfff1e0, 2.4);
+    scene.add(sunLight);
+
+    function updateSunPosition() {
+      const az = (parseFloat(document.getElementById('sunAzSlider').value) * Math.PI) / 180;
+      const el = (parseFloat(document.getElementById('sunElSlider').value) * Math.PI) / 180;
+      document.getElementById('sunAzVal').innerText = `${document.getElementById('sunAzSlider').value}°`;
+      document.getElementById('sunElVal').innerText = `${document.getElementById('sunElSlider').value}°`;
+
+      const r = 120;
+      sunLight.position.set(
+        controls.target.x + r * Math.cos(el) * Math.cos(az),
+        r * Math.sin(el),
+        controls.target.z + r * Math.cos(el) * Math.sin(az)
+      );
+    }
+
+    // Malha única 1x1 escalada dinamicamente conforme o bounding box dos tiles carregados
+    const segments = 256;
+    const baseGeometry = new THREE.PlaneGeometry(1, 1, segments, segments);
+    baseGeometry.rotateX(-Math.PI / 2);
+
+    const material = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.92,
+      metalness: 0.02,
+      normalScale: new THREE.Vector2(2.4, 2.4),
+      displacementScale: 1.0,
+      displacementBias: -0.5
+    });
+
+    const terrainMesh = new THREE.Mesh(baseGeometry, material);
+    scene.add(terrainMesh);
+
+    let currentMeshWidth = 10;
+    function syncDisplacementScale() {
+      const userExag = parseFloat(document.getElementById('dispSlider').value);
+      document.getElementById('dispVal').innerText = `${userExag.toFixed(1)}x`;
+      // Mantém a proporção vertical fisicamente consistente ao dar zoom in/out
+      const scaledDisp = userExag * (currentMeshWidth / 24);
+      material.displacementScale = scaledDisp;
+      material.displacementBias = -scaledDisp * 0.5;
+    }
+
+    // Cache em memória de tiles baixados para navegação rápida
+    const tileCache = new Map();
+    function fetchImageCached(url) {
+      if (tileCache.has(url)) return tileCache.get(url);
+      const promise = new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = url;
+      });
+      tileCache.set(url, promise);
+      return promise;
+    }
+
+    function latLonToTile(lat, lon, z) {
+      const cols = Math.pow(2, z + 1);
+      const rows = Math.pow(2, z);
+      const x = Math.floor(((lon + 180) / 360) * cols);
+      const y = Math.floor(((90 - lat) / 180) * rows);
+      return {
+        x: Math.max(0, Math.min(cols - 1, x)),
+        y: Math.max(0, Math.min(rows - 1, y)),
+        cols,
+        rows
+      };
+    }
+
+    function tileBounds(tx, ty, z) {
+      const cols = Math.pow(2, z + 1);
+      const rows = Math.pow(2, z);
+      const lonMin = (tx / cols) * 360 - 180;
+      const lonMax = ((tx + 1) / cols) * 360 - 180;
+      const latMax = 90 - (ty / rows) * 180;
+      const latMin = 90 - ((ty + 1) / rows) * 180;
+      return { lonMin, lonMax, latMin, latMax };
+    }
+
+    function overlapsJezero(b) {
+      return !(b.lonMax < 76.79 || b.lonMin > 77.74 || b.latMax < 17.57 || b.latMin > 18.88);
+    }
+
+    // Desenha um tile no canvas; se z > maxNativeZ, recorta e interpola o sub-quadrante do tile pai
+    async function drawLayerTile(ctx, layerId, ext, maxNativeZ, z, tx, ty, destX, destY, tileSize) {
+      if (z <= maxNativeZ) {
+        const url = `https://trek.nasa.gov/tiles/Mars/EQ/${layerId}/1.0.0/default/default028mm/${z}/${ty}/${tx}.${ext}`;
+        const img = await fetchImageCached(url);
+        if (img) ctx.drawImage(img, destX, destY, tileSize, tileSize);
+        return Boolean(img);
+      } else {
+        const dz = z - maxNativeZ;
+        const factor = Math.pow(2, dz);
+        const px = Math.floor(tx / factor);
+        const py = Math.floor(ty / factor);
+        const url = `https://trek.nasa.gov/tiles/Mars/EQ/${layerId}/1.0.0/default/default028mm/${maxNativeZ}/${py}/${px}.${ext}`;
+        const img = await fetchImageCached(url);
+        if (img) {
+          const subSize = tileSize / factor;
+          const sx = (tx % factor) * subSize;
+          const sy = (ty % factor) * subSize;
+          ctx.drawImage(img, sx, sy, subSize, subSize, destX, destY, tileSize, tileSize);
+        }
+        return Boolean(img);
+      }
+    }
+
+    // Gera Heightmap + Normal Map RGB (Sobel) combinando macro-relevo MOLA e micro-detalhe HiRISE
+    function computeReliefTextures(molaCanvas, hiriseCanvas, hasHiRise) {
+      const w = molaCanvas.width;
+      const h = molaCanvas.height;
+      const mData = molaCanvas.getContext('2d').getImageData(0, 0, w, h).data;
+      const hData = hasHiRise ? hiriseCanvas.getContext('2d').getImageData(0, 0, w, h).data : null;
+
+      const heightCanvas = document.createElement('canvas');
+      heightCanvas.width = w;
+      heightCanvas.height = h;
+      const hCtx = heightCanvas.getContext('2d');
+      const hImg = hCtx.createImageData(w, h);
+
+      const normalCanvas = document.createElement('canvas');
+      normalCanvas.width = w;
+      normalCanvas.height = h;
+      const nCtx = normalCanvas.getContext('2d');
+      const nImg = nCtx.createImageData(w, h);
+
+      const macroHeights = new Float32Array(w * h);
+      const normalHeights = new Float32Array(w * h);
+
+      for (let i = 0; i < w * h; i++) {
+        const r = mData[i * 4] / 255;
+        const g = mData[i * 4 + 1] / 255;
+        const b = mData[i * 4 + 2] / 255;
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        const hypso = (r - b + 1) * 0.5;
+        const molaElev = Math.max(0, Math.min(1, 0.55 * hypso + 0.45 * lum));
+
+        macroHeights[i] = molaElev;
+
+        if (hData && hData[i * 4 + 3] > 20) {
+          const hiLum = (0.299 * hData[i * 4] + 0.587 * hData[i * 4 + 1] + 0.114 * hData[i * 4 + 2]) / 255;
+          normalHeights[i] = 0.65 * molaElev + 0.35 * hiLum;
+        } else {
+          normalHeights[i] = molaElev;
+        }
+
+        const byteVal = Math.round(macroHeights[i] * 255);
+        hImg.data[i * 4] = byteVal;
+        hImg.data[i * 4 + 1] = byteVal;
+        hImg.data[i * 4 + 2] = byteVal;
+        hImg.data[i * 4 + 3] = 255;
+      }
+      hCtx.putImageData(hImg, 0, 0);
+
+      const strength = 6.5;
+      for (let y = 0; y < h; y++) {
+        const ym1 = Math.max(0, y - 1);
+        const yp1 = Math.min(h - 1, y + 1);
+        for (let x = 0; x < w; x++) {
+          const xm1 = Math.max(0, x - 1);
+          const xp1 = Math.min(w - 1, x + 1);
+
+          const tl = normalHeights[ym1 * w + xm1];
+          const t  = normalHeights[ym1 * w + x];
+          const tr = normalHeights[ym1 * w + xp1];
+          const l  = normalHeights[y * w + xm1];
+          const r  = normalHeights[y * w + xp1];
+          const bl = normalHeights[yp1 * w + xm1];
+          const b  = normalHeights[yp1 * w + x];
+          const br = normalHeights[yp1 * w + xp1];
+
+          const dx = (tr + 2 * r + br) - (tl + 2 * l + bl);
+          const dy = (bl + 2 * b + br) - (tl + 2 * t + tr);
+
+          let nx = -dx * strength;
+          let ny = -dy * strength;
+          let nz = 1.0;
+          const len = Math.hypot(nx, ny, nz);
+          nx /= len;
+          ny /= len;
+          nz /= len;
+
+          const idx = (y * w + x) * 4;
+          nImg.data[idx]     = Math.round((nx * 0.5 + 0.5) * 255);
+          nImg.data[idx + 1] = Math.round((ny * 0.5 + 0.5) * 255);
+          nImg.data[idx + 2] = Math.round((nz * 0.5 + 0.5) * 255);
+          nImg.data[idx + 3] = 255;
+        }
+      }
+      nCtx.putImageData(nImg, 0, 0);
+      return { heightCanvas, normalCanvas };
+    }
+
+    // Mapeia distância da câmera para nível de zoom WMTS (3 a 12)
+    function computeTargetZoom(distance) {
+      const z = Math.round(10.2 - Math.log2(Math.max(distance, 0.2)));
+      return Math.max(3, Math.min(12, z));
+    }
+
+    let lastLoadedKey = '';
+    let loadRequestId = 0;
+
+    async function updateDynamicLOD() {
+      const dist = camera.position.distanceTo(controls.target);
+      const z = computeTargetZoom(dist);
+
+      // Converte posição atual de controls.target no mundo 3D de volta para Lat/Lon
+      const focusLon = Math.max(-179.9, Math.min(179.9, anchorLon + controls.target.x / DEG_TO_WORLD));
+      const focusLat = Math.max(-85, Math.min(85, anchorLat - controls.target.z / DEG_TO_WORLD));
+
+      const center = latLonToTile(focusLat, focusLon, z);
+      const stateKey = `${z}:${center.x}:${center.y}`;
+
+      document.getElementById('hudCoords').innerText = `${focusLat.toFixed(3)}°, ${focusLon.toFixed(3)}°`;
+      document.getElementById('hudZoom').innerText = z;
+
+      if (stateKey === lastLoadedKey) return;
+      lastLoadedKey = stateKey;
+      const reqId = ++loadRequestId;
+
+      document.getElementById('status').innerText = `Atualizando malha para Zoom ${z}...`;
+
+      const tileSize = 256;
+      const canvasSize = tileSize * 3;
+
+      const colorCanvas = document.createElement('canvas');
+      colorCanvas.width = canvasSize;
+      colorCanvas.height = canvasSize;
+      const cCtx = colorCanvas.getContext('2d');
+      cCtx.fillStyle = '#2b1d16';
+      cCtx.fillRect(0, 0, canvasSize, canvasSize);
+
+      const molaCanvas = document.createElement('canvas');
+      molaCanvas.width = canvasSize;
+      molaCanvas.height = canvasSize;
+      const mCtx = molaCanvas.getContext('2d');
+
+      const hiriseCanvas = document.createElement('canvas');
+      hiriseCanvas.width = canvasSize;
+      hiriseCanvas.height = canvasSize;
+      const hiCtx = hiriseCanvas.getContext('2d');
+
+      let hiriseTilesLoaded = 0;
+      const tasks = [];
+
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const tx = (center.x + dx + center.cols) % center.cols;
+          const ty = Math.max(0, Math.min(center.rows - 1, center.y + dy));
+          const px = (dx + 1) * tileSize;
+          const py = (dy + 1) * tileSize;
+
+          tasks.push(
+            drawLayerTile(cCtx, 'Mars_Viking_MDIM21_ClrMosaic_global_232m', 'jpg', 7, z, tx, ty, px, py, tileSize)
+          );
+          tasks.push(
+            drawLayerTile(mCtx, 'Mars_MGS_MOLA_ClrShade_merge_global_463m', 'jpg', 7, z, tx, ty, px, py, tileSize)
+          );
+
+          // Se zoom >= 8 e o tile intersecta a Cratera Jezero, carrega HiRISE de altíssima resolução
+          const b = tileBounds(tx, ty, z);
+          if (z >= 8 && overlapsJezero(b)) {
+            tasks.push(
+              drawLayerTile(
+                hiCtx,
+                'NES_JEZ_MID_Visible_Mosaic_HiRISE_CTX_HRSC_GCS_MARS_07-10-2018',
+                'png',
+                12,
+                z,
+                tx,
+                ty,
+                px,
+                py,
+                tileSize
+              ).then((ok) => {
+                if (ok) hiriseTilesLoaded++;
+              })
+            );
+          }
+        }
+      }
+
+      await Promise.all(tasks);
+      if (reqId !== loadRequestId) return; // Descarta resposta obsoleta se o usuário continuou dando zoom
+
+      // Funde nitidez do HiRISE sobre a cor do Viking mantendo a tonalidade marciana
+      if (hiriseTilesLoaded > 0) {
+        cCtx.save();
+        cCtx.globalCompositeOperation = 'luminosity';
+        cCtx.globalAlpha = 0.88;
+        cCtx.drawImage(hiriseCanvas, 0, 0);
+        cCtx.restore();
+      }
+
+      const { heightCanvas, normalCanvas } = computeReliefTextures(molaCanvas, hiriseCanvas, hiriseTilesLoaded > 0);
+
+      // Calcula os limites geográficos exatos da grade 3x3 carregada para posicionar o plano sem saltos
+      const minX = Math.max(0, center.x - 1);
+      const maxX = Math.min(center.cols - 1, center.x + 1);
+      const minY = Math.max(0, center.y - 1);
+      const maxY = Math.min(center.rows - 1, center.y + 1);
+
+      const topLeft = tileBounds(minX, minY, z);
+      const bottomRight = tileBounds(maxX, maxY, z);
+
+      const spanLon = bottomRight.lonMax - topLeft.lonMin;
+      const spanLat = topLeft.latMax - bottomRight.latMin;
+      const midLon = (topLeft.lonMin + bottomRight.lonMax) * 0.5;
+      const midLat = (topLeft.latMin + bottomRight.latMax) * 0.5;
+
+      currentMeshWidth = spanLon * DEG_TO_WORLD;
+      const meshDepth = spanLat * DEG_TO_WORLD;
+
+      terrainMesh.scale.set(currentMeshWidth, 1, meshDepth);
+      terrainMesh.position.set(
+        (midLon - anchorLon) * DEG_TO_WORLD,
+        0,
+        -(midLat - anchorLat) * DEG_TO_WORLD
+      );
+      syncDisplacementScale();
+
+      // Atualiza texturas Three.js
+      if (material.map) material.map.dispose();
+      if (material.normalMap) material.normalMap.dispose();
+      if (material.displacementMap) material.displacementMap.dispose();
+
+      const colorTex = new THREE.CanvasTexture(colorCanvas);
+      colorTex.colorSpace = THREE.SRGBColorSpace;
+      colorTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+      material.map = colorTex;
+      material.normalMap = new THREE.CanvasTexture(normalCanvas);
+      material.displacementMap = new THREE.CanvasTexture(heightCanvas);
+      material.needsUpdate = true;
+
+      // Atualiza miniaturas
+      document.getElementById('colorPreview').getContext('2d').drawImage(colorCanvas, 0, 0, 128, 128);
+      document.getElementById('normalPreview').getContext('2d').drawImage(normalCanvas, 0, 0, 128, 128);
+
+      // Atualiza indicadores científicos de resolução
+      const badge = document.getElementById('sourceBadge');
+      const hudSource = document.getElementById('hudSource');
+      if (hiriseTilesLoaded > 0) {
+        badge.className = 'badge hirise';
+        badge.innerText = `Alta Resolução Ativa: HiRISE (~0.5m/px) + MOLA`;
+        hudSource.innerText = `HiRISE + Viking + MOLA (Zoom ${z})`;
+      } else if (z > 7) {
+        badge.className = 'badge interp';
+        badge.innerText = `Zoom ${z}: Relevo Global (z=7) Interpolado`;
+        hudSource.innerText = `Viking/MOLA z=7 interpolado (sem HiRISE local)`;
+      } else {
+        badge.className = 'badge';
+        badge.innerText = `Observação Orbital Global (Viking + MOLA)`;
+        hudSource.innerText = `Viking 232m + MOLA 463m (Zoom ${z})`;
+      }
+
+      document.getElementById('status').innerText = `✅ Malha atualizada (Zoom ${z}).`;
+    }
+
+    // Debounce no movimento da câmera para evitar requisições excessivas durante o scroll
+    let lodTimer = null;
+    controls.addEventListener('change', () => {
+      updateSunPosition();
+      clearTimeout(lodTimer);
+      lodTimer = setTimeout(updateDynamicLOD, 260);
+    });
+
+    window.jumpTo = function (lat, lon, camDist = 18) {
+      document.getElementById('latInput').value = lat.toFixed(2);
+      document.getElementById('lonInput').value = lon.toFixed(2);
+      anchorLat = lat;
+      anchorLon = lon;
+      lastLoadedKey = '';
+
+      controls.target.set(0, 0, 0);
+      camera.position.set(0, camDist * 0.72, camDist * 0.85);
+      controls.update();
+      updateDynamicLOD();
+    };
+
+    window.jumpToInput = function () {
+      const lat = parseFloat(document.getElementById('latInput').value);
+      const lon = parseFloat(document.getElementById('lonInput').value);
+      if (isNaN(lat) || isNaN(lon) || lat < -85 || lat > 85 || lon < -180 || lon > 180) {
+        alert('Insira coordenadas válidas (Lat: -85 a 85, Lon: -180 a 180).');
+        return;
+      }
+      jumpTo(lat, lon, 16);
+    };
+
+    document.getElementById('dispSlider').addEventListener('input', syncDisplacementScale);
+    document.getElementById('normSlider').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      document.getElementById('normVal').innerText = val.toFixed(1);
+      material.normalScale.set(val, val);
+    });
+    document.getElementById('sunAzSlider').addEventListener('input', updateSunPosition);
+    document.getElementById('sunElSlider').addEventListener('input', updateSunPosition);
+
+    window.addEventListener('resize', () => {
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    updateSunPosition();
+    updateDynamicLOD();
+    animate();
+  </script>
+</body>
+</html>
