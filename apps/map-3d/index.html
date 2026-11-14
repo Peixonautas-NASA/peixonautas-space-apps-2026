@@ -3,84 +3,101 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Peixonautas — Relevo 3D Marciano com LOD Dinâmico</title>
+  <title>Peixonautas — Relevo 3D Marciano (Escala Real 1:1)</title>
   <style>
     body { margin: 0; font-family: system-ui, -apple-system, sans-serif; display: flex; height: 100vh; background: #0d1117; color: #e6edf3; overflow: hidden; }
-    #sidebar { width: 340px; padding: 16px; background: #161b22; border-right: 1px solid #30363d; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; z-index: 10; }
+    #sidebar { width: 355px; padding: 16px; background: #161b22; border-right: 1px solid #30363d; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; z-index: 10; }
     #canvasContainer { flex: 1; position: relative; background: #05070a; }
     h2 { margin: 0 0 4px 0; font-size: 18px; color: #58a6ff; }
     .subtitle { font-size: 12px; color: #8b949e; }
     .card { background: #21262d; padding: 12px; border-radius: 8px; border: 1px solid #30363d; font-size: 13px; }
-    .badge { font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #1f6feb; color: #fff; display: inline-block; margin-top: 6px; }
-    .badge.hirise { background: #238636; }
-    .badge.interp { background: #9e6a03; }
+    .badge { font-size: 11px; padding: 3px 7px; border-radius: 4px; background: #1f6feb; color: #fff; display: inline-block; margin-top: 8px; line-height: 1.35; }
+    .badge.dem { background: #238636; }
+    .badge.fallback { background: #9e6a03; }
     label { display: block; font-size: 12px; color: #c9d1d9; margin-top: 8px; }
-    input[type="number"], button { width: 100%; padding: 8px; margin-top: 4px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: #fff; box-sizing: border-box; }
+    input[type="number"], input[type="file"], button { width: 100%; padding: 8px; margin-top: 4px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: #fff; box-sizing: border-box; font-size: 12px; }
     input[type="range"] { width: 100%; margin-top: 4px; accent-color: #58a6ff; }
-    button { background: #238636; border: none; font-weight: 600; cursor: pointer; margin-top: 8px; }
+    button { background: #238636; border: none; font-weight: 600; cursor: pointer; margin-top: 8px; font-size: 13px; }
     button:hover { background: #2ea043; }
     .preset-btn { background: #30363d; font-weight: 500; margin-top: 6px; }
     .preset-btn:hover { background: #484f58; }
-    .preview-row { display: flex; gap: 8px; margin-top: 8px; }
-    .preview-box { flex: 1; text-align: center; font-size: 11px; color: #8b949e; }
+    .real-btn { background: #1f6feb; font-weight: 600; margin-top: 8px; }
+    .real-btn:hover { background: #388bfd; }
+    .preview-row { display: flex; gap: 6px; margin-top: 8px; }
+    .preview-box { flex: 1; text-align: center; font-size: 10px; color: #8b949e; }
     .preview-box canvas { width: 100%; height: auto; border-radius: 4px; border: 1px solid #30363d; background: #0d1117; }
     #hudOverlay {
-      position: absolute; top: 14px; right: 14px; background: rgba(22, 27, 34, 0.88);
+      position: absolute; top: 14px; right: 14px; background: rgba(22, 27, 34, 0.90);
       border: 1px solid #30363d; border-radius: 8px; padding: 10px 14px; font-size: 12px;
-      pointer-events: none; backdrop-filter: blur(4px); line-height: 1.5;
+      pointer-events: none; backdrop-filter: blur(4px); line-height: 1.55;
     }
-    #status { font-size: 11px; color: #8b949e; margin-top: 6px; }
+    #status { font-size: 11px; color: #8b949e; margin-top: 6px; line-height: 1.4; }
   </style>
 </head>
 <body>
   <div id="sidebar">
     <div>
-      <h2>Relevo 3D Marciano</h2>
-      <div class="subtitle">LOD Dinâmico no Zoom (Viking + MOLA + HiRISE)</div>
+      <h2>Relevo 3D Marciano (1:1)</h2>
+      <div class="subtitle">Cromaticidade Invariante + Malha Float32</div>
     </div>
 
     <div class="card">
       <strong>Navegar para Coordenada</strong>
-      <label>Latitude (-90 a 90):</label>
+      <label>Latitude (-85 a 85):</label>
       <input type="number" id="latInput" step="0.01" value="18.40" />
       <label>Longitude (-180 a 180):</label>
       <input type="number" id="lonInput" step="0.01" value="77.50" />
       <button onclick="jumpToInput()">Centralizar Ponto</button>
 
-      <button class="preset-btn" onclick="jumpTo(18.40, 77.50, 14)">Cratera Jezero (Zoom até HiRISE)</button>
-      <button class="preset-btn" onclick="jumpTo(-13.90, -59.20, 36)">Valles Marineris (Cânion)</button>
-      <button class="preset-btn" onclick="jumpTo(18.65, -133.80, 42)">Olympus Mons (Vulcão)</button>
-      <button class="preset-btn" onclick="jumpTo(-4.59, 137.44, 18)">Cratera Gale (Monte Sharp)</button>
-      <div id="status">Use o scroll do mouse para aumentar a resolução.</div>
+      <button class="preset-btn" onclick="jumpTo(18.40, 77.50, 90)">Cratera Jezero (Área Candidata)</button>
+      <button class="preset-btn" onclick="jumpTo(-13.90, -59.20, 420)">Valles Marineris (Cânion)</button>
+      <button class="preset-btn" onclick="jumpTo(18.65, -133.80, 680)">Olympus Mons (Vulcão)</button>
+      <button class="preset-btn" onclick="jumpTo(-4.59, 137.44, 130)">Cratera Gale (Monte Sharp)</button>
+      <div id="status">Use o scroll para aproximar e aumentar a resolução.</div>
     </div>
 
     <div class="card">
-      <strong>Controles de Relevo e Sol</strong>
-      <label>Exagero Vertical: <span id="dispVal">1.6x</span></label>
-      <input type="range" id="dispSlider" min="0" max="5" step="0.1" value="1.6" />
+      <strong>DEM Local Opcional (USGS / HiRISE DTM)</strong>
+      <label>Importar recorte DEM (PNG/JPG escala de cinza):</label>
+      <input type="file" id="customDemInput" accept="image/png,image/jpeg,image/webp" />
+      <button class="preset-btn" id="clearCustomDemBtn" style="display:none;" onclick="clearCustomDem()">Voltar para Relevo Orbital</button>
+    </div>
 
-      <label>Intensidade do Normal Map: <span id="normVal">2.4</span></label>
-      <input type="range" id="normSlider" min="0" max="5" step="0.1" value="2.4" />
+    <div class="card">
+      <strong>Escala Vertical, Suavização e Sol</strong>
+      <label>Fator Vertical: <span id="dispVal">1.0x (Real 1:1)</span></label>
+      <input type="range" id="dispSlider" min="0.5" max="5" step="0.1" value="1.0" />
+      <button class="real-btn" onclick="resetRealScale()">Resetar para Escala Real (1.0x)</button>
+
+      <label>Suavização Gaussiana: <span id="smoothVal">5 px</span></label>
+      <input type="range" id="smoothSlider" min="1" max="15" step="1" value="5" />
+
+      <label>Ganho do Normal Map: <span id="normVal">1.0</span></label>
+      <input type="range" id="normSlider" min="0" max="3.0" step="0.1" value="1.0" />
 
       <label>Azimute Solar: <span id="sunAzVal">45°</span></label>
       <input type="range" id="sunAzSlider" min="0" max="360" step="1" value="45" />
 
-      <label>Elevação Solar: <span id="sunElVal">30°</span></label>
-      <input type="range" id="sunElSlider" min="5" max="85" step="1" value="30" />
+      <label>Elevação Solar: <span id="sunElVal">28°</span></label>
+      <input type="range" id="sunElSlider" min="5" max="85" step="1" value="28" />
 
-      <div id="sourceBadge" class="badge">Observação Orbital Global (Viking + MOLA)</div>
+      <div id="sourceBadge" class="badge fallback">Reconstrução via Cromaticidade MOLA (-8,2 a +21,2 km)</div>
     </div>
 
     <div class="card">
-      <strong>Texturas Ativas no Zoom Atual</strong>
+      <strong>Mapas Gerados no Plano 2D</strong>
       <div class="preview-row">
         <div class="preview-box">
-          <canvas id="colorPreview" width="128" height="128"></canvas>
-          <div>Cor (Alvo Atual)</div>
+          <canvas id="colorPreview" width="110" height="110"></canvas>
+          <div>Cor (Viking)</div>
         </div>
         <div class="preview-box">
-          <canvas id="normalPreview" width="128" height="128"></canvas>
-          <div>Normal Map (Sobel)</div>
+          <canvas id="heightPreview" width="110" height="110"></canvas>
+          <div>Elevação</div>
+        </div>
+        <div class="preview-box">
+          <canvas id="normalPreview" width="110" height="110"></canvas>
+          <div>Normal Map</div>
         </div>
       </div>
     </div>
@@ -89,8 +106,10 @@
   <div id="canvasContainer">
     <div id="hudOverlay">
       <div><strong>Foco:</strong> <span id="hudCoords">18.40°N, 77.50°E</span></div>
+      <div><strong>Malha Visível:</strong> <span id="hudSpan">-- km × -- km</span></div>
+      <div><strong>Elevação Est. no Centro:</strong> <span id="hudElev">-- km</span></div>
       <div><strong>Nível LOD (WMTS):</strong> Zoom <span id="hudZoom">6</span> / 12</div>
-      <div><strong>Fonte:</strong> <span id="hudSource">Viking 232m + MOLA 463m</span></div>
+      <div><strong>Fonte Topográfica:</strong> <span id="hudSource">MOLA ClrShade (Cromaticidade)</span></div>
     </div>
   </div>
 
@@ -111,13 +130,22 @@
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x06080c);
 
-    // Escala espacial: 1 grau planetário = 10 unidades no mundo 3D
-    const DEG_TO_WORLD = 10.0;
+    // Constantes físicas reais de Marte (1 unidade no mundo 3D = 1 quilômetro)
+    const MARS_RADIUS_KM = 3389.5;
+    const KM_PER_DEG_LAT = (Math.PI / 180) * MARS_RADIUS_KM; // ≈ 59.158 km/grau
+    const MOLA_MIN_ELEV_KM = -8.2;  // Hellas Planitia
+    const MOLA_MAX_ELEV_KM = 21.2;  // Cume do Olympus Mons
+    const MOLA_SPAN_KM = MOLA_MAX_ELEV_KM - MOLA_MIN_ELEV_KM; // 29.4 km
+
+    function kmPerDegLon(lat) {
+      return KM_PER_DEG_LAT * Math.max(0.08, Math.cos((lat * Math.PI) / 180));
+    }
+
     let anchorLat = 18.40;
     let anchorLon = 77.50;
 
-    const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.02, 1000);
-    camera.position.set(0, 14, 16);
+    const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.2, 12000);
+    camera.position.set(0, 65, 80);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(container.clientWidth, container.clientHeight);
@@ -130,10 +158,9 @@
     controls.enableDamping = true;
     controls.dampingFactor = 0.07;
     controls.maxPolarAngle = Math.PI * 0.49;
-    controls.minDistance = 0.25;
-    controls.maxDistance = 140;
+    controls.minDistance = 1.2;
+    controls.maxDistance = 2400;
 
-    // Iluminação
     const ambientLight = new THREE.AmbientLight(0xffd6ba, 0.28);
     scene.add(ambientLight);
 
@@ -146,7 +173,7 @@
       document.getElementById('sunAzVal').innerText = `${document.getElementById('sunAzSlider').value}°`;
       document.getElementById('sunElVal').innerText = `${document.getElementById('sunElSlider').value}°`;
 
-      const r = 120;
+      const r = 1500;
       sunLight.position.set(
         controls.target.x + r * Math.cos(el) * Math.cos(az),
         r * Math.sin(el),
@@ -154,7 +181,7 @@
       );
     }
 
-    // Malha única 1x1 escalada dinamicamente conforme o bounding box dos tiles carregados
+    // Malha 2D subdividida — elevação aplicada diretamente nos vértices em Float32
     const segments = 256;
     const baseGeometry = new THREE.PlaneGeometry(1, 1, segments, segments);
     baseGeometry.rotateX(-Math.PI / 2);
@@ -163,25 +190,20 @@
       color: 0xffffff,
       roughness: 0.92,
       metalness: 0.02,
-      normalScale: new THREE.Vector2(2.4, 2.4),
-      displacementScale: 1.0,
-      displacementBias: -0.5
+      normalScale: new THREE.Vector2(1.0, 1.0)
     });
 
     const terrainMesh = new THREE.Mesh(baseGeometry, material);
     scene.add(terrainMesh);
 
-    let currentMeshWidth = 10;
-    function syncDisplacementScale() {
-      const userExag = parseFloat(document.getElementById('dispSlider').value);
-      document.getElementById('dispVal').innerText = `${userExag.toFixed(1)}x`;
-      // Mantém a proporção vertical fisicamente consistente ao dar zoom in/out
-      const scaledDisp = userExag * (currentMeshWidth / 24);
-      material.displacementScale = scaledDisp;
-      material.displacementBias = -scaledDisp * 0.5;
-    }
+    let currentMeshWidthKm = 100;
+    let currentMeshDepthKm = 100;
+    let currentZoomLevel = 6;
+    let lastElevCanvas = null;
+    let lastHiriseCanvas = null;
+    let lastHiriseWeight = 0;
+    let customDemCanvas = null;
 
-    // Cache em memória de tiles baixados para navegação rápida
     const tileCache = new Map();
     function fetchImageCached(url) {
       if (tileCache.has(url)) return tileCache.get(url);
@@ -194,6 +216,263 @@
       });
       tileCache.set(url, promise);
       return promise;
+    }
+
+    function applyFloat32VertexElevation(heights, w, h, exag) {
+      const posAttr = baseGeometry.attributes.position;
+      const count = posAttr.count;
+
+      for (let i = 0; i < count; i++) {
+        const u = Math.max(0, Math.min(1, posAttr.getX(i) + 0.5));
+        const v = Math.max(0, Math.min(1, posAttr.getZ(i) + 0.5));
+
+        const fx = u * (w - 1);
+        const fy = v * (h - 1);
+        const x0 = Math.floor(fx);
+        const y0 = Math.floor(fy);
+        const x1 = Math.min(w - 1, x0 + 1);
+        const y1 = Math.min(h - 1, y0 + 1);
+        const tx = fx - x0;
+        const ty = fy - y0;
+
+        const h00 = heights[y0 * w + x0];
+        const h10 = heights[y0 * w + x1];
+        const h01 = heights[y1 * w + x0];
+        const h11 = heights[y1 * w + x1];
+
+        const h0 = h00 + (h10 - h00) * tx;
+        const h1 = h01 + (h11 - h01) * tx;
+        const hNorm = h0 + (h1 - h0) * ty;
+
+        const elevKm = (MOLA_MIN_ELEV_KM + hNorm * MOLA_SPAN_KM) * exag;
+        posAttr.setY(i, elevKm);
+      }
+
+      posAttr.needsUpdate = true;
+      baseGeometry.computeVertexNormals();
+      baseGeometry.computeBoundingSphere();
+    }
+
+    function getVerticalExag() {
+      return parseFloat(document.getElementById('dispSlider').value);
+    }
+
+    function getSmoothRadius(z, isRawDem) {
+      const baseRadius = parseInt(document.getElementById('smoothSlider').value, 10);
+      document.getElementById('smoothVal').innerText = `${baseRadius} px`;
+      const overZoomFactor = z > 7 ? Math.pow(1.4, z - 7) : 1.0;
+      const modeFactor = isRawDem ? 0.5 : 1.0;
+      return Math.min(26, Math.max(1, Math.round(baseRadius * overZoomFactor * modeFactor)));
+    }
+
+    function rebuildCurrentTerrainMaps() {
+      const exag = getVerticalExag();
+      document.getElementById('dispVal').innerText = exag === 1.0 ? '1.0x (Real 1:1)' : `${exag.toFixed(1)}x`;
+
+      const worldDispKm = exag * MOLA_SPAN_KM;
+      const sourceCanvas = customDemCanvas || lastElevCanvas;
+      const isRawDem = Boolean(customDemCanvas);
+      const smoothRadius = getSmoothRadius(currentZoomLevel, isRawDem);
+
+      if (sourceCanvas) {
+        const { macroHeights, heightCanvas, normalCanvas } = computeReliefTextures(
+          sourceCanvas,
+          isRawDem,
+          lastHiriseCanvas,
+          lastHiriseWeight,
+          worldDispKm,
+          currentMeshWidthKm,
+          currentMeshDepthKm,
+          smoothRadius
+        );
+
+        applyFloat32VertexElevation(macroHeights, sourceCanvas.width, sourceCanvas.height, exag);
+
+        if (material.normalMap) material.normalMap.dispose();
+        material.normalMap = new THREE.CanvasTexture(normalCanvas);
+        material.needsUpdate = true;
+
+        document.getElementById('heightPreview').getContext('2d').drawImage(heightCanvas, 0, 0, 110, 110);
+        document.getElementById('normalPreview').getContext('2d').drawImage(normalCanvas, 0, 0, 110, 110);
+      }
+    }
+
+    window.resetRealScale = function () {
+      document.getElementById('dispSlider').value = '1.0';
+      document.getElementById('normSlider').value = '1.0';
+      document.getElementById('smoothSlider').value = '5';
+      document.getElementById('normVal').innerText = '1.0';
+      material.normalScale.set(1.0, 1.0);
+      rebuildCurrentTerrainMaps();
+    };
+
+    // Polilinha aberta em cromaticidade L1 normalizada (cr, cg, cb) — SEM wrap-around de 360° e invariante a sombras
+    const CHROMA_STOPS = [
+      { t: 0.00, c: [0.26, 0.00, 0.74] }, // -8.2 km: Índigo/Violeta
+      { t: 0.14, c: [0.00, 0.22, 0.78] }, // -4.1 km: Azul profundo
+      { t: 0.28, c: [0.00, 0.49, 0.51] }, //  0.0 km: Ciano (Datum)
+      { t: 0.42, c: [0.00, 0.92, 0.08] }, // +4.1 km: Verde
+      { t: 0.56, c: [0.51, 0.49, 0.00] }, // +8.2 km: Amarelo
+      { t: 0.70, c: [0.70, 0.30, 0.00] }, // +12.3 km: Laranja
+      { t: 0.85, c: [1.00, 0.00, 0.00] }, // +16.7 km: Vermelho
+      { t: 0.95, c: [0.68, 0.00, 0.32] }  // +19.7 km: Magenta/Rosa (encostas Tharsis/Olympus)
+    ];
+
+    function decodeClrShadeChromaticity(r, g, b) {
+      const maxC = Math.max(r, g, b);
+      const minC = Math.min(r, g, b);
+      const chroma = maxC - minC;
+      const isBrightWhite = maxC > 195 && minC > 175;
+
+      // Pixels acromáticos (sombras escuras do hillshade ou reflexos brancos) recebem conf = 0 para preenchimento vizinho
+      if (chroma < 14) {
+        return { t: 0.28, conf: 0, isBrightWhite };
+      }
+
+      const dr = r - minC;
+      const dg = g - minC;
+      const db = b - minC;
+      const sum = dr + dg + db || 1;
+
+      const cr = dr / sum;
+      const cg = dg / sum;
+      const cb = db / sum;
+
+      let bestT = 0.28;
+      let bestDistSq = Infinity;
+
+      for (let i = 0; i < CHROMA_STOPS.length - 1; i++) {
+        const a = CHROMA_STOPS[i].c;
+        const p = CHROMA_STOPS[i + 1].c;
+        const vx = p[0] - a[0];
+        const vy = p[1] - a[1];
+        const vz = p[2] - a[2];
+        const vLenSq = vx * vx + vy * vy + vz * vz || 1;
+
+        let u = ((cr - a[0]) * vx + (cg - a[1]) * vy + (cb - a[2]) * vz) / vLenSq;
+        u = Math.max(0, Math.min(1, u));
+
+        const qx = a[0] + u * vx;
+        const qy = a[1] + u * vy;
+        const qz = a[2] + u * vz;
+        const dSq = (cr - qx) ** 2 + (cg - qy) ** 2 + (cb - qz) ** 2;
+
+        if (dSq < bestDistSq) {
+          bestDistSq = dSq;
+          bestT = CHROMA_STOPS[i].t + u * (CHROMA_STOPS[i + 1].t - CHROMA_STOPS[i].t);
+        }
+      }
+
+      const conf = Math.min(1.0, (chroma - 13) / 42);
+      return { t: bestT, conf, isBrightWhite };
+    }
+
+    // Difusão iterativa para preencher faixas de sombra do hillshade com a altitude das encostas vizinhas
+    function inpaintShadows(heights, confs, brightFlags, w, h, iterations = 6) {
+      let curH = new Float32Array(heights);
+      let curC = new Float32Array(confs);
+      let nextH = new Float32Array(w * h);
+      let nextC = new Float32Array(w * h);
+
+      for (let iter = 0; iter < iterations; iter++) {
+        for (let y = 0; y < h; y++) {
+          const ym1 = Math.max(0, y - 1);
+          const yp1 = Math.min(h - 1, y + 1);
+          for (let x = 0; x < w; x++) {
+            const idx = y * w + x;
+            if (curC[idx] > 0.35) {
+              nextH[idx] = curH[idx];
+              nextC[idx] = curC[idx];
+              continue;
+            }
+
+            const xm1 = Math.max(0, x - 1);
+            const xp1 = Math.min(w - 1, x + 1);
+
+            let sumHW = curH[idx] * curC[idx] * 2.0;
+            let sumW = curC[idx] * 2.0;
+
+            const neighbors = [
+              ym1 * w + xm1, ym1 * w + x, ym1 * w + xp1,
+              y * w + xm1,                y * w + xp1,
+              yp1 * w + xm1, yp1 * w + x, yp1 * w + xp1
+            ];
+
+            for (let k = 0; k < 8; k++) {
+              const nIdx = neighbors[k];
+              const wgt = curC[nIdx];
+              if (wgt > 0.01) {
+                sumHW += curH[nIdx] * wgt;
+                sumW += wgt;
+              }
+            }
+
+            if (sumW > 0.001) {
+              nextH[idx] = sumHW / sumW;
+              nextC[idx] = Math.min(0.8, (sumW / 9.0) * 0.9);
+            } else {
+              nextH[idx] = curH[idx];
+              nextC[idx] = curC[idx];
+            }
+          }
+        }
+        [curH, nextH] = [nextH, curH];
+        [curC, nextC] = [nextC, curC];
+      }
+
+      // Eleva cumes brancos APENAS quando a vizinhança já está em alta altitude (Tharsis / Olympus Mons)
+      for (let i = 0; i < w * h; i++) {
+        if (brightFlags[i] && curH[i] > 0.76) {
+          const blend = Math.min(1, (curH[i] - 0.76) / 0.16);
+          curH[i] = curH[i] * (1 - blend) + 1.0 * blend;
+        }
+      }
+      return curH;
+    }
+
+    // Filtro box separável de 1 passada
+    function boxBlurPass(src, dst, w, h, radius) {
+      const temp = new Float32Array(w * h);
+      const diam = radius * 2 + 1;
+
+      for (let y = 0; y < h; y++) {
+        const row = y * w;
+        let sum = 0;
+        for (let k = -radius; k <= radius; k++) {
+          sum += src[row + Math.max(0, Math.min(w - 1, k))];
+        }
+        for (let x = 0; x < w; x++) {
+          temp[row + x] = sum / diam;
+          const addIdx = Math.min(w - 1, x + radius + 1);
+          const subIdx = Math.max(0, x - radius);
+          sum += src[row + addIdx] - src[row + subIdx];
+        }
+      }
+
+      for (let x = 0; x < w; x++) {
+        let sum = 0;
+        for (let k = -radius; k <= radius; k++) {
+          sum += temp[Math.max(0, Math.min(h - 1, k)) * w + x];
+        }
+        for (let y = 0; y < h; y++) {
+          dst[y * w + x] = sum / diam;
+          const addIdx = Math.min(h - 1, y + radius + 1);
+          const subIdx = Math.max(0, y - radius);
+          sum += temp[addIdx * w + x] - temp[subIdx * w + x];
+        }
+      }
+    }
+
+    // 3 passadas de box blur = aproximação Gaussiana verdadeira sem serrilhados
+    function gaussianSmooth3Pass(heights, w, h, radius) {
+      if (radius <= 0) return heights;
+      const r = Math.max(1, Math.round(radius * 0.65));
+      const bufA = new Float32Array(heights);
+      const bufB = new Float32Array(w * h);
+      boxBlurPass(bufA, bufB, w, h, r);
+      boxBlurPass(bufB, bufA, w, h, r);
+      boxBlurPass(bufA, bufB, w, h, r);
+      return bufB;
     }
 
     function latLonToTile(lat, lon, z) {
@@ -223,7 +502,6 @@
       return !(b.lonMax < 76.79 || b.lonMin > 77.74 || b.latMax < 17.57 || b.latMin > 18.88);
     }
 
-    // Desenha um tile no canvas; se z > maxNativeZ, recorta e interpola o sub-quadrante do tile pai
     async function drawLayerTile(ctx, layerId, ext, maxNativeZ, z, tx, ty, destX, destY, tileSize) {
       if (z <= maxNativeZ) {
         const url = `https://trek.nasa.gov/tiles/Mars/EQ/${layerId}/1.0.0/default/default028mm/${z}/${ty}/${tx}.${ext}`;
@@ -247,12 +525,13 @@
       }
     }
 
-    // Gera Heightmap + Normal Map RGB (Sobel) combinando macro-relevo MOLA e micro-detalhe HiRISE
-    function computeReliefTextures(molaCanvas, hiriseCanvas, hasHiRise) {
-      const w = molaCanvas.width;
-      const h = molaCanvas.height;
-      const mData = molaCanvas.getContext('2d').getImageData(0, 0, w, h).data;
-      const hData = hasHiRise ? hiriseCanvas.getContext('2d').getImageData(0, 0, w, h).data : null;
+    function computeReliefTextures(elevCanvas, isRawDem, hiriseCanvas, hiriseWeight, worldDispKm, meshWidthKm, meshDepthKm, smoothRadius) {
+      const w = elevCanvas.width;
+      const h = elevCanvas.height;
+      const eData = elevCanvas.getContext('2d').getImageData(0, 0, w, h).data;
+      const hData = (hiriseWeight > 0 && hiriseCanvas)
+        ? hiriseCanvas.getContext('2d').getImageData(0, 0, w, h).data
+        : null;
 
       const heightCanvas = document.createElement('canvas');
       heightCanvas.width = w;
@@ -266,27 +545,38 @@
       const nCtx = normalCanvas.getContext('2d');
       const nImg = nCtx.createImageData(w, h);
 
-      const macroHeights = new Float32Array(w * h);
-      const normalHeights = new Float32Array(w * h);
+      const rawHeights = new Float32Array(w * h);
+      const confWeights = new Float32Array(w * h);
+      const brightFlags = new Uint8Array(w * h);
+      const hiLumArr = hData ? new Float32Array(w * h) : null;
 
       for (let i = 0; i < w * h; i++) {
-        const r = mData[i * 4] / 255;
-        const g = mData[i * 4 + 1] / 255;
-        const b = mData[i * 4 + 2] / 255;
-        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-        const hypso = (r - b + 1) * 0.5;
-        const molaElev = Math.max(0, Math.min(1, 0.55 * hypso + 0.45 * lum));
-
-        macroHeights[i] = molaElev;
-
-        if (hData && hData[i * 4 + 3] > 20) {
-          const hiLum = (0.299 * hData[i * 4] + 0.587 * hData[i * 4 + 1] + 0.114 * hData[i * 4 + 2]) / 255;
-          normalHeights[i] = 0.65 * molaElev + 0.35 * hiLum;
+        if (isRawDem) {
+          const lum = (0.299 * eData[i * 4] + 0.587 * eData[i * 4 + 1] + 0.114 * eData[i * 4 + 2]) / 255;
+          rawHeights[i] = lum;
+          confWeights[i] = 1.0;
         } else {
-          normalHeights[i] = molaElev;
+          const { t, conf, isBrightWhite } = decodeClrShadeChromaticity(eData[i * 4], eData[i * 4 + 1], eData[i * 4 + 2]);
+          rawHeights[i] = t;
+          confWeights[i] = conf;
+          brightFlags[i] = isBrightWhite ? 1 : 0;
         }
 
-        const byteVal = Math.round(macroHeights[i] * 255);
+        if (hData && hData[i * 4 + 3] > 20) {
+          hiLumArr[i] = (0.299 * hData[i * 4] + 0.587 * hData[i * 4 + 1] + 0.114 * hData[i * 4 + 2]) / 255;
+        } else if (hiLumArr) {
+          hiLumArr[i] = 0.5;
+        }
+      }
+
+      const filledHeights = isRawDem
+        ? rawHeights
+        : inpaintShadows(rawHeights, confWeights, brightFlags, w, h, 8);
+
+      const macroHeights = gaussianSmooth3Pass(filledHeights, w, h, smoothRadius);
+
+      for (let i = 0; i < w * h; i++) {
+        const byteVal = Math.max(0, Math.min(255, Math.round(macroHeights[i] * 255)));
         hImg.data[i * 4] = byteVal;
         hImg.data[i * 4 + 1] = byteVal;
         hImg.data[i * 4 + 2] = byteVal;
@@ -294,7 +584,36 @@
       }
       hCtx.putImageData(hImg, 0, 0);
 
-      const strength = 6.5;
+      const centerNorm = macroHeights[Math.floor(h / 2) * w + Math.floor(w / 2)];
+      const centerElevKm = MOLA_MIN_ELEV_KM + centerNorm * MOLA_SPAN_KM;
+
+      // Normal Map derivado da malha suavizada + microrrelevo passa-alta do HiRISE
+      const normalField = new Float32Array(w * h);
+      const microAmplitude = (0.010 / MOLA_SPAN_KM) * hiriseWeight;
+
+      for (let y = 0; y < h; y++) {
+        const ym2 = Math.max(0, y - 2);
+        const yp2 = Math.min(h - 1, y + 2);
+        for (let x = 0; x < w; x++) {
+          const idx = y * w + x;
+          if (hiLumArr && hiriseWeight > 0) {
+            const xm2 = Math.max(0, x - 2);
+            const xp2 = Math.min(w - 1, x + 2);
+            const localMean = 0.25 * (
+              hiLumArr[ym2 * w + x] + hiLumArr[yp2 * w + x] +
+              hiLumArr[y * w + xm2] + hiLumArr[y * w + xp2]
+            );
+            const highPass = Math.max(-0.15, Math.min(0.15, hiLumArr[idx] - localMean));
+            normalField[idx] = macroHeights[idx] + highPass * microAmplitude;
+          } else {
+            normalField[idx] = macroHeights[idx];
+          }
+        }
+      }
+
+      const scaleX = (worldDispKm * w) / (8 * Math.max(meshWidthKm, 0.01));
+      const scaleZ = (worldDispKm * h) / (8 * Math.max(meshDepthKm, 0.01));
+
       for (let y = 0; y < h; y++) {
         const ym1 = Math.max(0, y - 1);
         const yp1 = Math.min(h - 1, y + 1);
@@ -302,20 +621,21 @@
           const xm1 = Math.max(0, x - 1);
           const xp1 = Math.min(w - 1, x + 1);
 
-          const tl = normalHeights[ym1 * w + xm1];
-          const t  = normalHeights[ym1 * w + x];
-          const tr = normalHeights[ym1 * w + xp1];
-          const l  = normalHeights[y * w + xm1];
-          const r  = normalHeights[y * w + xp1];
-          const bl = normalHeights[yp1 * w + xm1];
-          const b  = normalHeights[yp1 * w + x];
-          const br = normalHeights[yp1 * w + xp1];
+          const tl = normalField[ym1 * w + xm1];
+          const t  = normalField[ym1 * w + x];
+          const tr = normalField[ym1 * w + xp1];
+          const l  = normalField[y * w + xm1];
+          const r  = normalField[y * w + xp1];
+          const bl = normalField[yp1 * w + xm1];
+          const b  = normalField[yp1 * w + x];
+          const br = normalField[yp1 * w + xp1];
 
           const dx = (tr + 2 * r + br) - (tl + 2 * l + bl);
           const dy = (bl + 2 * b + br) - (tl + 2 * t + tr);
 
-          let nx = -dx * strength;
-          let ny = -dy * strength;
+          // Limita declive máximo do normal map para evitar cintilação especular
+          let nx = Math.max(-2.5, Math.min(2.5, -dx * scaleX));
+          let ny = Math.max(-2.5, Math.min(2.5, -dy * scaleZ));
           let nz = 1.0;
           const len = Math.hypot(nx, ny, nz);
           nx /= len;
@@ -330,37 +650,41 @@
         }
       }
       nCtx.putImageData(nImg, 0, 0);
-      return { heightCanvas, normalCanvas };
+      return { macroHeights, heightCanvas, normalCanvas, centerElevKm };
     }
 
-    // Mapeia distância da câmera para nível de zoom WMTS (3 a 12)
-    function computeTargetZoom(distance) {
-      const z = Math.round(10.2 - Math.log2(Math.max(distance, 0.2)));
-      return Math.max(3, Math.min(12, z));
+    function computeContinuousZoom(distanceKm) {
+      return 13.5 - Math.log2(Math.max(distanceKm, 0.5));
+    }
+
+    function computeTargetZoom(distanceKm) {
+      return Math.max(3, Math.min(12, Math.round(computeContinuousZoom(distanceKm))));
     }
 
     let lastLoadedKey = '';
     let loadRequestId = 0;
 
     async function updateDynamicLOD() {
-      const dist = camera.position.distanceTo(controls.target);
-      const z = computeTargetZoom(dist);
+      const distKm = camera.position.distanceTo(controls.target);
+      const continuousZoom = computeContinuousZoom(distKm);
+      const z = computeTargetZoom(distKm);
 
-      // Converte posição atual de controls.target no mundo 3D de volta para Lat/Lon
-      const focusLon = Math.max(-179.9, Math.min(179.9, anchorLon + controls.target.x / DEG_TO_WORLD));
-      const focusLat = Math.max(-85, Math.min(85, anchorLat - controls.target.z / DEG_TO_WORLD));
+      const lonScale = kmPerDegLon(anchorLat);
+      const focusLon = Math.max(-179.9, Math.min(179.9, anchorLon + controls.target.x / lonScale));
+      const focusLat = Math.max(-85, Math.min(85, anchorLat - controls.target.z / KM_PER_DEG_LAT));
 
       const center = latLonToTile(focusLat, focusLon, z);
-      const stateKey = `${z}:${center.x}:${center.y}`;
+      const stateKey = `${z}:${center.x}:${center.y}:${customDemCanvas ? 'custom' : 'wmts'}`;
 
       document.getElementById('hudCoords').innerText = `${focusLat.toFixed(3)}°, ${focusLon.toFixed(3)}°`;
       document.getElementById('hudZoom').innerText = z;
 
       if (stateKey === lastLoadedKey) return;
       lastLoadedKey = stateKey;
+      currentZoomLevel = z;
       const reqId = ++loadRequestId;
 
-      document.getElementById('status').innerText = `Atualizando malha para Zoom ${z}...`;
+      document.getElementById('status').innerText = `Atualizando malha Float32 para Zoom ${z}...`;
 
       const tileSize = 256;
       const canvasSize = tileSize * 3;
@@ -372,10 +696,10 @@
       cCtx.fillStyle = '#2b1d16';
       cCtx.fillRect(0, 0, canvasSize, canvasSize);
 
-      const molaCanvas = document.createElement('canvas');
-      molaCanvas.width = canvasSize;
-      molaCanvas.height = canvasSize;
-      const mCtx = molaCanvas.getContext('2d');
+      const elevCanvas = document.createElement('canvas');
+      elevCanvas.width = canvasSize;
+      elevCanvas.height = canvasSize;
+      const eCtx = elevCanvas.getContext('2d');
 
       const hiriseCanvas = document.createElement('canvas');
       hiriseCanvas.width = canvasSize;
@@ -395,11 +719,13 @@
           tasks.push(
             drawLayerTile(cCtx, 'Mars_Viking_MDIM21_ClrMosaic_global_232m', 'jpg', 7, z, tx, ty, px, py, tileSize)
           );
-          tasks.push(
-            drawLayerTile(mCtx, 'Mars_MGS_MOLA_ClrShade_merge_global_463m', 'jpg', 7, z, tx, ty, px, py, tileSize)
-          );
 
-          // Se zoom >= 8 e o tile intersecta a Cratera Jezero, carrega HiRISE de altíssima resolução
+          if (!customDemCanvas) {
+            tasks.push(
+              drawLayerTile(eCtx, 'Mars_MGS_MOLA_ClrShade_merge_global_463m', 'jpg', 7, z, tx, ty, px, py, tileSize)
+            );
+          }
+
           const b = tileBounds(tx, ty, z);
           if (z >= 8 && overlapsJezero(b)) {
             tasks.push(
@@ -423,48 +749,65 @@
       }
 
       await Promise.all(tasks);
-      if (reqId !== loadRequestId) return; // Descarta resposta obsoleta se o usuário continuou dando zoom
+      if (reqId !== loadRequestId) return;
 
-      // Funde nitidez do HiRISE sobre a cor do Viking mantendo a tonalidade marciana
-      if (hiriseTilesLoaded > 0) {
+      const tZoom = Math.max(0, Math.min(1, (continuousZoom - 7.5) / 2.0));
+      const hiriseWeight = hiriseTilesLoaded > 0 ? (tZoom * tZoom * (3 - 2 * tZoom)) : 0;
+
+      if (hiriseWeight > 0) {
         cCtx.save();
         cCtx.globalCompositeOperation = 'luminosity';
-        cCtx.globalAlpha = 0.88;
+        cCtx.globalAlpha = 0.88 * hiriseWeight;
         cCtx.drawImage(hiriseCanvas, 0, 0);
         cCtx.restore();
       }
 
-      const { heightCanvas, normalCanvas } = computeReliefTextures(molaCanvas, hiriseCanvas, hiriseTilesLoaded > 0);
-
-      // Calcula os limites geográficos exatos da grade 3x3 carregada para posicionar o plano sem saltos
-      const minX = Math.max(0, center.x - 1);
-      const maxX = Math.min(center.cols - 1, center.x + 1);
       const minY = Math.max(0, center.y - 1);
       const maxY = Math.min(center.rows - 1, center.y + 1);
-
-      const topLeft = tileBounds(minX, minY, z);
-      const bottomRight = tileBounds(maxX, maxY, z);
+      const topLeft = tileBounds(center.x - 1, minY, z);
+      const bottomRight = tileBounds(center.x + 1, maxY, z);
 
       const spanLon = bottomRight.lonMax - topLeft.lonMin;
       const spanLat = topLeft.latMax - bottomRight.latMin;
       const midLon = (topLeft.lonMin + bottomRight.lonMax) * 0.5;
       const midLat = (topLeft.latMin + bottomRight.latMax) * 0.5;
 
-      currentMeshWidth = spanLon * DEG_TO_WORLD;
-      const meshDepth = spanLat * DEG_TO_WORLD;
+      const localLonScale = kmPerDegLon(midLat);
+      currentMeshWidthKm = spanLon * localLonScale;
+      currentMeshDepthKm = spanLat * KM_PER_DEG_LAT;
+      lastElevCanvas = elevCanvas;
+      lastHiriseCanvas = hiriseCanvas;
+      lastHiriseWeight = hiriseWeight;
 
-      terrainMesh.scale.set(currentMeshWidth, 1, meshDepth);
-      terrainMesh.position.set(
-        (midLon - anchorLon) * DEG_TO_WORLD,
-        0,
-        -(midLat - anchorLat) * DEG_TO_WORLD
+      const activeElevCanvas = customDemCanvas || elevCanvas;
+      const activeIsRawDem = Boolean(customDemCanvas);
+
+      const exag = getVerticalExag();
+      const worldDispKm = exag * MOLA_SPAN_KM;
+      const smoothRadius = getSmoothRadius(z, activeIsRawDem);
+
+      const { macroHeights, heightCanvas, normalCanvas, centerElevKm } = computeReliefTextures(
+        activeElevCanvas,
+        activeIsRawDem,
+        hiriseCanvas,
+        hiriseWeight,
+        worldDispKm,
+        currentMeshWidthKm,
+        currentMeshDepthKm,
+        smoothRadius
       );
-      syncDisplacementScale();
 
-      // Atualiza texturas Three.js
+      terrainMesh.scale.set(currentMeshWidthKm, 1, currentMeshDepthKm);
+      terrainMesh.position.set(
+        (midLon - anchorLon) * localLonScale,
+        0,
+        -(midLat - anchorLat) * KM_PER_DEG_LAT
+      );
+
+      applyFloat32VertexElevation(macroHeights, activeElevCanvas.width, activeElevCanvas.height, exag);
+
       if (material.map) material.map.dispose();
       if (material.normalMap) material.normalMap.dispose();
-      if (material.displacementMap) material.displacementMap.dispose();
 
       const colorTex = new THREE.CanvasTexture(colorCanvas);
       colorTex.colorSpace = THREE.SRGBColorSpace;
@@ -472,34 +815,60 @@
 
       material.map = colorTex;
       material.normalMap = new THREE.CanvasTexture(normalCanvas);
-      material.displacementMap = new THREE.CanvasTexture(heightCanvas);
       material.needsUpdate = true;
 
-      // Atualiza miniaturas
-      document.getElementById('colorPreview').getContext('2d').drawImage(colorCanvas, 0, 0, 128, 128);
-      document.getElementById('normalPreview').getContext('2d').drawImage(normalCanvas, 0, 0, 128, 128);
+      document.getElementById('colorPreview').getContext('2d').drawImage(colorCanvas, 0, 0, 110, 110);
+      document.getElementById('heightPreview').getContext('2d').drawImage(heightCanvas, 0, 0, 110, 110);
+      document.getElementById('normalPreview').getContext('2d').drawImage(normalCanvas, 0, 0, 110, 110);
 
-      // Atualiza indicadores científicos de resolução
+      document.getElementById('hudSpan').innerText = `${currentMeshWidthKm.toFixed(1)} km × ${currentMeshDepthKm.toFixed(1)} km`;
+      document.getElementById('hudElev').innerText = `${centerElevKm >= 0 ? '+' : ''}${centerElevKm.toFixed(2)} km`;
+
       const badge = document.getElementById('sourceBadge');
       const hudSource = document.getElementById('hudSource');
-      if (hiriseTilesLoaded > 0) {
-        badge.className = 'badge hirise';
-        badge.innerText = `Alta Resolução Ativa: HiRISE (~0.5m/px) + MOLA`;
-        hudSource.innerText = `HiRISE + Viking + MOLA (Zoom ${z})`;
-      } else if (z > 7) {
-        badge.className = 'badge interp';
-        badge.innerText = `Zoom ${z}: Relevo Global (z=7) Interpolado`;
-        hudSource.innerText = `Viking/MOLA z=7 interpolado (sem HiRISE local)`;
+
+      if (customDemCanvas) {
+        badge.className = 'badge dem';
+        badge.innerText = 'DEM Local Importado (Escala de Cinza Direta)';
+        hudSource.innerText = 'DEM Local + Viking/HiRISE';
       } else {
-        badge.className = 'badge';
-        badge.innerText = `Observação Orbital Global (Viking + MOLA)`;
-        hudSource.innerText = `Viking 232m + MOLA 463m (Zoom ${z})`;
+        badge.className = 'badge fallback';
+        badge.innerText = 'Reconstrução via Cromaticidade MOLA (-8,2 a +21,2 km)';
+        hudSource.innerText = `MOLA ClrShade + ${hiriseWeight > 0 ? 'HiRISE' : 'Viking'} (Zoom ${z})`;
       }
 
-      document.getElementById('status').innerText = `✅ Malha atualizada (Zoom ${z}).`;
+      document.getElementById('status').innerText = `✅ Malha contínua atualizada (Zoom ${z}).`;
     }
 
-    // Debounce no movimento da câmera para evitar requisições excessivas durante o scroll
+    document.getElementById('customDemInput').addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          const c = document.createElement('canvas');
+          c.width = 768;
+          c.height = 768;
+          c.getContext('2d').drawImage(img, 0, 0, 768, 768);
+          customDemCanvas = c;
+          document.getElementById('clearCustomDemBtn').style.display = 'block';
+          lastLoadedKey = '';
+          updateDynamicLOD();
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    window.clearCustomDem = function () {
+      customDemCanvas = null;
+      document.getElementById('customDemInput').value = '';
+      document.getElementById('clearCustomDemBtn').style.display = 'none';
+      lastLoadedKey = '';
+      updateDynamicLOD();
+    };
+
     let lodTimer = null;
     controls.addEventListener('change', () => {
       updateSunPosition();
@@ -507,7 +876,7 @@
       lodTimer = setTimeout(updateDynamicLOD, 260);
     });
 
-    window.jumpTo = function (lat, lon, camDist = 18) {
+    window.jumpTo = function (lat, lon, camDistKm = 120) {
       document.getElementById('latInput').value = lat.toFixed(2);
       document.getElementById('lonInput').value = lon.toFixed(2);
       anchorLat = lat;
@@ -515,7 +884,7 @@
       lastLoadedKey = '';
 
       controls.target.set(0, 0, 0);
-      camera.position.set(0, camDist * 0.72, camDist * 0.85);
+      camera.position.set(0, camDistKm * 0.65, camDistKm * 0.85);
       controls.update();
       updateDynamicLOD();
     };
@@ -527,10 +896,11 @@
         alert('Insira coordenadas válidas (Lat: -85 a 85, Lon: -180 a 180).');
         return;
       }
-      jumpTo(lat, lon, 16);
+      jumpTo(lat, lon, 110);
     };
 
-    document.getElementById('dispSlider').addEventListener('input', syncDisplacementScale);
+    document.getElementById('dispSlider').addEventListener('input', rebuildCurrentTerrainMaps);
+    document.getElementById('smoothSlider').addEventListener('input', rebuildCurrentTerrainMaps);
     document.getElementById('normSlider').addEventListener('input', (e) => {
       const val = parseFloat(e.target.value);
       document.getElementById('normVal').innerText = val.toFixed(1);
