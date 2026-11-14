@@ -85,6 +85,83 @@ function makeCanvas(size) {
   return c;
 }
 
+/**
+ * Imagem REAL do NASA Trek para um quadrado do mundo [cx +- half] x [cz +- half], sem filtros:
+ * mosaico Viking MDIM 2.1 e, onde houver cobertura (Jezero), o mosaico HiRISE/CTX/HRSC por cima.
+ * Cada camada é baixada no zoom NATIVO que corresponde à resolução pedida (Viking até z7, HiRISE
+ * até z17) e desenhada pela posição real dos tiles, sem "zoom esticado" de tile único.
+ *  - hirise: 'map2d' = como no apps/map-2d (sobreposto, opacidade 0,9);
+ *            'map3d' = como no apps/map-3d (mistura de luminosidade, 0,88).
+ */
+export async function composeRegionImage(world, cx, cz, half, { size = 1024, hirise = 'map2d', maxTiles = 64 } = {}) {
+  const nw = world.toLatLon(cx - half, cz - half);
+  const se = world.toLatLon(cx + half, cz + half);
+  const box = { lonMin: nw.lon, lonMax: se.lon, latMax: nw.lat, latMin: se.lat };
+  const canvas = makeCanvas(size);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#2b1d16';
+  ctx.fillRect(0, 0, size, size);
+  const mpp = (2 * half) / size;
+  const zFor = (maxZ) => Math.max(0, Math.min(maxZ, Math.ceil(Math.log2(((180 / TILE) * M_PER_DEG_LAT) / mpp))));
+  const toPx = (lat, lon) => [
+    ((lon - box.lonMin) / (box.lonMax - box.lonMin)) * size,
+    ((box.latMax - lat) / (box.latMax - box.latMin)) * size,
+  ];
+
+  async function drawLayer(target, layer, zWanted) {
+    let z = zWanted;
+    let a;
+    let b;
+    for (;;) {
+      a = latLonToTile(box.latMax, box.lonMin, z);
+      b = latLonToTile(box.latMin, box.lonMax, z);
+      if ((b.x - a.x + 1) * (b.y - a.y + 1) <= maxTiles || z === 0) break;
+      z--;
+    }
+    const jobs = [];
+    for (let ty = a.y; ty <= b.y; ty++) {
+      for (let tx = a.x; tx <= b.x; tx++) {
+        const url = `${TREK}/${layer.id}/1.0.0/default/default028mm/${z}/${ty}/${tx}.${layer.ext}`;
+        jobs.push(
+          fetchImage(url).then((img) => {
+            if (!img) return 0;
+            const t = tileBounds(tx, ty, z);
+            const [x0, y0] = toPx(t.latMax, t.lonMin);
+            const [x1, y1] = toPx(t.latMin, t.lonMax);
+            target.drawImage(img, x0, y0, x1 - x0, y1 - y0);
+            return 1;
+          })
+        );
+      }
+    }
+    const loaded = (await Promise.all(jobs)).reduce((s, v) => s + v, 0);
+    return { z, loaded };
+  }
+
+  ctx.imageSmoothingQuality = 'high';
+  const viking = await drawLayer(ctx, LAYERS.color, zFor(LAYERS.color.maxZ));
+  const sources = [`Viking MDIM 2.1 z${viking.z}`];
+  let mPerPx = ((180 / 2 ** viking.z) * M_PER_DEG_LAT) / TILE;
+  if (overlaps(box, JEZERO_BOUNDS)) {
+    const hiCanvas = makeCanvas(size);
+    const hiCtx = hiCanvas.getContext('2d');
+    hiCtx.imageSmoothingQuality = 'high';
+    const hi = await drawLayer(hiCtx, LAYERS.hirise, zFor(LAYERS.hirise.maxZ));
+    if (hi.loaded) {
+      ctx.save();
+      if (hirise === 'map3d') {
+        ctx.globalCompositeOperation = 'luminosity';
+        ctx.globalAlpha = 0.88;
+      } else ctx.globalAlpha = 0.9;
+      ctx.drawImage(hiCanvas, 0, 0);
+      ctx.restore();
+      sources.push(`HiRISE/CTX z${hi.z}`);
+      mPerPx = ((180 / 2 ** hi.z) * M_PER_DEG_LAT) / TILE;
+    }
+  }
+  return { canvas, sources, mPerPx };
+}
+
 // ---------- Shader do terreno: remendos HiRISE + detalhe procedural ----------
 function makeTerrainUniforms() {
   const blank = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1);
@@ -284,6 +361,7 @@ async function buildChunk(world, tileX, tileY, exag, onProgress) {
     tileY,
     heightAt,
     setExag,
+    colorCanvas, // mosaico Viking do bloco (usado pelos mapas em miniatura)
     bounds: { minX: nw.x, maxX: se.x, minZ: nw.z, maxZ: se.z },
     dispose() {
       geometry.dispose();

@@ -1,9 +1,12 @@
-# Visão VR (v0.3): caminhar em Marte pelo celular, deitado e em tela cheia
+# Visão VR (v0.4): caminhar em Marte pelo celular, com mapas flutuantes
 
 Você fica de pé no terreno marciano em **escala real (1:1)**, na altura dos olhos (1,7 m).
-Girando o celular, a câmera gira junto. **Segurando o botão "Andar"**, você caminha na direção
-para onde está olhando. No chão há uma rota (faixa ciano com setas animadas) que leva até um
-farol âmbar no destino.
+Girando o celular, a câmera gira junto. **Segurando "Andar"**, você caminha livre para onde
+olha, inclusive subindo montanhas para ver o destino de longe. O botão de **play** faz o astronauta
+seguir a rota sozinho. A rota é uma faixa ciano com setas animadas no chão, que leva até um farol
+âmbar no destino. Ao redor dele flutuam dois
+**widgets espaciais**, como num visor de realidade aumentada: um **Mapa 2D** e um **Mapa 3D**
+(uma maquete holográfica).
 
 - **Relevo:** é o mesmo do `apps/map-3d`. A cor do MOLA ClrShade é convertida em elevação por
   cromaticidade, numa faixa de **-8,2 a +21,2 km**. Depois as sombras são preenchidas e o
@@ -43,7 +46,7 @@ O Vite mostra dois endereços:
 3. O certificado é autoassinado, então o navegador vai avisar:
    - **iPhone (Safari):** Mostrar Detalhes → **visitar este site** → confirmar.
    - **Android (Chrome):** Avançado → **Continuar para 192.168.x.y (não seguro)**.
-4. Toque em **Ativar sensores**. No iPhone, aceite o acesso a "Movimento e Orientação".
+4. Toque em **Entrar**. No iPhone, aceite o acesso a "Movimento e Orientação".
 5. Se o celular não conseguir abrir a página, o mais provável é o **Firewall do Windows**.
    Permita o Node.js em *redes privadas* e confira se o Wi-Fi do PC está marcado como rede
    *Privada*. Algumas redes (de faculdade, de evento ou de convidados) isolam os aparelhos
@@ -69,32 +72,66 @@ aparecer. Pelo túnel não há aviso de certificado.
 
 ### Testar no computador
 
-Abra `https://localhost:5173/`. Arraste com o mouse para olhar e use **W/A/S/D** ou as setas
-para andar. **Shift** deixa 5x mais rápido. Alguns parâmetros de URL úteis:
+Abra `https://localhost:5173/`. Arraste com o mouse para olhar. **Espaço** pausa a caminhada,
+**W/A/S/D** ou as setas andam livre e **Shift** deixa 5x mais rápido. Alguns parâmetros de URL úteis:
 
 - `?local=olympus`, `?local=valles`, `?local=gale` ou `?local=jezero` escolhem o local;
-- `?estereo=1` abre direto no modo estéreo.
+- `?estereo=1` abre direto no modo estéreo;
+- `?debug` expõe `window.__vr` (câmera, widgets, caminhada) para testes automatizados.
 
 ## Como usar (celular deitado)
 
-A Visão VR foi feita para usar **na horizontal**. Ao abrir, toque em **▶ Entrar**: esse único
+A Visão VR foi feita para usar **na horizontal**. Ao abrir, toque em **Entrar**: esse único
 toque liga a **tela cheia**, trava a orientação na **horizontal** (no Android) e ativa os
 **sensores**. Se o celular estiver em pé, aparece um aviso pedindo para deitar, que dá para
 dispensar.
 
+O HUD é enxuto, sem emojis, só com texto curto e ícones SVG:
+
 | Onde | Controle | O que faz |
 |---|---|---|
-| polegar direito | **⬆ Andar** (segure) | Anda na direção em que você olha. No modo estéreo, segurar qualquer ponto da tela (ou o botão do Cardboard) também anda. |
-| polegar esquerdo | **🚶 / 🚙 / 🚀** | Troca a velocidade: caminhada (1,4 m/s), rover (15 m/s) ou rápido (300 m/s). |
-| polegar esquerdo | **🎯 Rota** | Alinha a direção atual do celular com o próximo trecho da rota. |
-| canto superior | **⛶** | Liga ou desliga a tela cheia. No iPhone, explica como instalar como app. |
-| canto superior | **🧭** | Liga ou desliga os sensores (no iOS, pede permissão). |
-| canto superior | **👓** | Modo estéreo para Cardboard. |
-| canto superior | **⚙** | Local, escala vertical (1,0x = real), resposta dos sensores e textura de detalhe. |
+| canto superior esquerdo | tela cheia · sensores · estéreo · ajustes | Liga ou desliga cada um. No iPhone, o de tela cheia explica como instalar como app. |
+| topo, no centro | linha do destino | Distância até o destino e para que lado ele está. Embaixo, em letra pequena: rumo, elevação e quanto você já andou. |
+| canto inferior direito | **Andar** (segure) | Caminha livre para onde você olha. Isso pausa o piloto automático. |
+| canto inferior esquerdo | play/pausa · velocidade · alvo | O play faz o astronauta seguir a rota sozinho (ao chegar, vira "recomeçar"). A velocidade alterna entre 1,4, 15 e 300 m/s e vale para os dois modos. O alvo vira o olhar para a rota. |
+| canto superior direito | **Mapa 2D · Mapa 3D** | Seletor discreto que mostra ou esconde cada widget. Ao reabrir, o widget aparece à sua frente. |
+
+No modo estéreo, a interface some. Segurar a tela (ou o botão do Cardboard) faz andar.
+
+### Widgets espaciais (Mapa 2D e Mapa 3D)
+
+São painéis de vidro que **existem no mundo**, não na tela:
+
+- **Seguem a sua posição, mas não a rotação da cabeça.** Quando você anda, eles vão junto, na
+  mesma distância (1,45 m) e no mesmo ângulo. Quando você vira a cabeça, eles ficam onde estavam
+  e saem do campo de visão.
+- **Arrastar a barra de título** (no Mapa 2D, qualquer parte) leva o painel para outro ponto ao
+  seu redor, sempre à mesma distância. A posição fica salva no navegador.
+- **No Mapa 3D, arrastar a maquete** faz ela girar, para ver o trajeto de qualquer ângulo.
+- **O X fecha.** O seletor no canto superior direito reabre.
+- **Longe da rota**, por exemplo subindo uma montanha, os dois mapas acompanham você:
+  - o Mapa 2D baixa os mesmos tiles reais em volta da sua posição;
+  - o Mapa 3D refaz a maquete para mostrar você e a rota juntos;
+  - quando você volta, a maquete detalhada da rota volta também.
+- **Dados reais da NASA nos dois mapas.** As camadas são as mesmas do `apps/map-2d` e do
+  `apps/map-3d`: mosaico **Viking MDIM 2.1** e, em Jezero, o mosaico **HiRISE/CTX/HRSC**. O relevo
+  é o **MOLA** decodificado por cromaticidade. Cada camada vem do NASA Trek no zoom nativo
+  adequado: em Jezero, HiRISE z16, com ~1 m/px. Não há filtros nem cores inventadas, e a fonte
+  aparece no canto de cada mapa.
+- **Mapa 2D:** fica centrado em você, com o norte para cima, e se ajusta para a rota inteira
+  sempre caber. O HiRISE vai por cima do Viking com opacidade 0,9, como no `map-2d`. Mostra o trecho percorrido (cinza claro), o que falta (ciano), o destino e a sua
+  posição, com o cone indicando para onde você olha.
+- **Mapa 3D:** é uma miniatura do terreno ao redor da rota, montada com a receita do `map-3d`:
+  - textura Viking com o HiRISE misturado por luminosidade (0,88);
+  - relevo MOLA com suavização gaussiana;
+  - sol a 45° de azimute e 28° de elevação.
+
+  O exagero vertical é automático e aparece no título. A maquete mostra o trecho percorrido, o
+  destino e você.
 
 ### Tela cheia
 
-- **Android (Chrome):** o ▶ Entrar ou o ⛶ já entram em tela cheia e travam na horizontal. Também
+- **Android (Chrome):** o botão Entrar ou o de tela cheia já entram em tela cheia e travam na horizontal. Também
   dá para instalar (menu ⋮ → **Instalar app** ou **Adicionar à tela inicial**). O app instalado
   já abre em tela cheia e na horizontal, configurado pelo `public/manifest.webmanifest`.
 - **iPhone (Safari):** o Safari **não permite tela cheia** em páginas comuns. O caminho é
@@ -111,10 +148,11 @@ quanto você já andou.
 ```
 src/
   main.js         cena, céu, luz, interface, estéreo, tela cheia, HUD
+  widgets.js      widgets espaciais: Mapa 2D, Mapa 3D (maquete), arrastar, abrir/fechar
   mola.js         elevação por cromaticidade do MOLA ClrShade (porta do map-3d)
   terrain.js      mundo em metros: blocos de terreno que se trocam ao andar,
                   remendos HiRISE no shader, textura de detalhe procedural
-  locomotion.js   caminhar (botão, toque no estéreo, teclado), câmera presa ao chão
+  locomotion.js   piloto automático pela rota, teclado no PC, câmera presa ao chão
   orientation.js  DeviceOrientation -> quaternion, suavização, arrastar, recentralizar
   route.js        rota colada ao terreno: faixa, setas, farol
   places.js       locais (os mesmos atalhos do map-3d) e rota de exemplo
@@ -138,6 +176,21 @@ src/
 - **Normal map:** usa tangentes calculadas na geometria. Sem elas, o three.js deriva o
   referencial a partir de `dFdx(uv)`, que perde precisão perto da câmera e vira um "chuvisco"
   escuro.
+- **"Seguir a posição, mas não a rotação":**
+  - cada widget guarda só um azimute e uma elevação, num referencial **fixo no mundo** (norte =
+    −Z);
+  - a cada quadro, `posição = olho + 1,45 m × direção(azimute, elevação)`, e `lookAt(olho)` deixa
+    o painel de frente e de pé;
+  - o quaternion da câmera nunca entra nessa conta.
+- **Arrastar um widget não gira a câmera:**
+  - os toques são ouvidos no `window` na **fase de captura**;
+  - se o raio do dedo acerta um painel, o evento é interrompido antes de chegar ao canvas, onde
+    está o controle de olhar;
+  - ao mover, o azimute e a elevação passam a seguir o raio do dedo, e a distância não muda.
+- **Mapa 3D:** é uma cena separada, renderizada numa textura com fundo transparente, que fica
+  num plano à frente do vidro.
+- **Piloto automático:** o astronauta persegue um ponto um pouco à frente na rota. Andar livre
+  (botão Andar ou teclado) pausa o piloto. O play retoma, e ele volta para a rota.
 - **Rota:** em Jezero, a rota de exemplo é definida em lat/lon. Nos outros locais, o ponto de
   partida é o lugar mais plano num raio de 15 km do preset, e a rota de ~800 m segue o rumo
   mais plano a partir dali.
@@ -156,7 +209,11 @@ src/
   é liso, e o detalhe visível é a textura procedural.
 - **Sem curvatura:** o planeta é tratado como plano. Em Marte, o horizonte de uma pessoa de pé
   fica a ~3,4 km. Aqui dá para ver mais longe.
-- **Andar fisicamente:** na v0.2 você anda pelo botão. Para andar com passos reais, a próxima
+- **Mapas em miniatura fora de Jezero:** a única textura global é o Viking, com ~325 m/px. Numa
+  rota de ~800 m, isso dá poucos pixels, e o mapa fica quase uniforme. É o dado real disponível.
+  Em Jezero, o HiRISE mostra o chão em detalhe. O relevo tem um vértice a cada ~650 m, então
+  rotas curtas e planas geram uma maquete quase plana.
+- **Andar fisicamente:** hoje você anda pelo botão ou pelo piloto automático. Para andar com passos reais, a próxima
   etapa seria WebXR AR, que funciona no Chrome do Android.
 
 ## Proposta: código para `packages/shared` (ainda não movido)
