@@ -7,7 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="theme-color" content="#0d1117" />
-  <title>Peixonautas · Visão VR (Jezero)</title>
+  <title>Peixonautas · Visão VR (caminhar em Marte)</title>
   <style>
     html, body { margin: 0; height: 100%; overflow: hidden; background: #05070a; color: #e6edf3;
       font-family: system-ui, -apple-system, sans-serif; -webkit-user-select: none; user-select: none;
@@ -39,6 +39,16 @@
     #settings label { display: block; margin-top: 8px; }
     #settings input[type="range"] { width: 100%; accent-color: #58a6ff; }
     #settings p { margin: 8px 0 0; color: #8b949e; font-size: 11px; line-height: 1.4; }
+    #settings select { width: 100%; margin-top: 4px; padding: 8px; border-radius: 8px; background: #0d1117; color: #e6edf3;
+      border: 1px solid #30363d; font: inherit; }
+    #settings button.small { width: 100%; margin-top: 6px; padding: 7px; font-size: 12px; background: #1f6feb; border-color: #388bfd; }
+    #settings label.check { display: flex; gap: 8px; align-items: center; }
+
+    .walkRow { display: flex; gap: 10px; align-items: center; margin-bottom: 4px; }
+    #walkBtn { pointer-events: auto; font-size: 18px; padding: 16px 30px; border-radius: 999px; background: rgba(31, 111, 235, 0.88);
+      border-color: #58a6ff; touch-action: none; -webkit-touch-callout: none; }
+    #walkBtn.active { background: #3ee6ff; color: #04212a; transform: scale(1.06); }
+    #speedBtn { pointer-events: auto; border-radius: 999px; font-size: 13px; padding: 10px 12px; }
 
     #crosshair { position: fixed; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%;
       background: rgba(255, 255, 255, 0.7); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4); pointer-events: none; z-index: 4; }
@@ -74,21 +84,32 @@
 
   <div id="settings">
     <strong>Ajustes</strong>
-    <label>Exagero do relevo: <span id="reliefVal">1.0x</span>
-      <input type="range" id="reliefSlider" min="0" max="3" step="0.1" value="1" />
+    <label>Local
+      <select id="placeSelect"></select>
     </label>
+    <label>Escala vertical: <span id="exagVal">1.0x (real 1:1)</span>
+      <input type="range" id="exagSlider" min="0.5" max="5" step="0.1" value="1" />
+    </label>
+    <button id="exagReset" class="small">Voltar para escala real (1.0x)</button>
     <label>Resposta dos sensores: <span id="smoothVal">10</span>
       <input type="range" id="smoothSlider" min="1" max="30" step="1" value="10" />
     </label>
-    <p>Menor = mais suave (menos tremor, mais atraso). Arraste na tela para girar; com sensores ligados, o arrastar ajusta só o rumo.</p>
-    <p>Relevo aproximado: pseudo-elevação do MOLA sombreado (mesma fonte do mapa 3D), não é um DEM em metros.</p>
+    <label class="check"><input type="checkbox" id="detailToggle" checked /> Textura de detalhe perto dos pés</label>
+    <p>Sensores: menor = mais suave (menos tremor, mais atraso). Arraste na tela para girar; com sensores ligados, o arrastar ajusta só o rumo.</p>
+    <p>PC: W/A/S/D ou setas para andar, Shift = 5x mais rápido.</p>
+    <p>Relevo: mesmo do mapa 3D (cromaticidade do MOLA ClrShade, -8,2 a +21,2 km). É uma reconstrução, não um DEM medido. A textura de detalhe é procedural, só para dar noção de movimento.</p>
   </div>
 
   <div id="crosshair"></div>
 
   <div id="hud" class="bar">
+    <div class="walkRow">
+      <button id="speedBtn" title="Velocidade">🚶 1,4 m/s</button>
+      <button id="walkBtn">⬆ Andar</button>
+    </div>
     <div class="pill" id="hudDest">Carregando rota…</div>
-    <div class="pill"><span id="hudHeading">Rumo —</span> · <span id="hudSource">—</span></div>
+    <div class="pill" id="hudInfo">Rumo —</div>
+    <div id="hudSource">—</div>
   </div>
 
   <button id="exitStereo">✕ sair do estéreo</button>
@@ -96,7 +117,7 @@
 
   <div id="loading">
     <h1>Peixonautas · Visão VR</h1>
-    <div>Cratera Jezero · ponto de pouso do Perseverance</div>
+    <div id="loadingPlace">—</div>
     <div id="loadingText">Preparando terreno…</div>
   </div>
 

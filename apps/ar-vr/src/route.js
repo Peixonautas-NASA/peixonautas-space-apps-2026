@@ -1,17 +1,6 @@
-// Rota de exemplo desenhada no chão: faixa contínua + setas animadas + farol no destino.
-// Os waypoints estão em lat/lon para, no futuro, virem do planejador em packages/shared.
+// Rota desenhada no chão: faixa contínua + setas animadas + farol no destino.
+// Recebe pontos em coordenadas do mundo (metros); quem chama converte de lat/lon.
 import * as THREE from 'three';
-
-// Ponto de pouso do Perseverance (Octavia E. Butler Landing), Cratera Jezero
-export const START = { lat: 18.4447, lon: 77.4508, name: 'Octavia E. Butler Landing' };
-
-export const EXAMPLE_ROUTE = [
-  { lat: 18.4447, lon: 77.4508 },
-  { lat: 18.4458, lon: 77.4511 },
-  { lat: 18.4467, lon: 77.4519 },
-  { lat: 18.4482, lon: 77.4513 },
-  { lat: 18.4498, lon: 77.4501, name: 'Destino de exemplo' },
-];
 
 const LIFT = 0.12; // m acima do solo, contra z-fighting
 const RIBBON_W = 0.6;
@@ -67,9 +56,8 @@ function makeLabel(text) {
   return sprite;
 }
 
-export function buildRoute(terrain, waypoints = EXAMPLE_ROUTE) {
+export function buildRoute(terrain, pts2d, destName = 'Destino') {
   const group = new THREE.Group();
-  const pts2d = waypoints.map((w) => terrain.toWorld(w.lat, w.lon));
   const path = densify(pts2d, 1.0);
   const total = path[path.length - 1].d;
   const yAt = (x, z) => terrain.heightAt(x, z) + LIFT;
@@ -174,7 +162,7 @@ export function buildRoute(terrain, waypoints = EXAMPLE_ROUTE) {
       fog: false,
     })
   );
-  const label = makeLabel(`${waypoints[waypoints.length - 1].name ?? 'Destino'} · ${Math.round(total)} m`);
+  const label = makeLabel(`${destName} · ${Math.round(total)} m`);
   label.material.fog = false;
   destGroup.add(ring, beam, label);
   group.add(destGroup);
@@ -197,7 +185,7 @@ export function buildRoute(terrain, waypoints = EXAMPLE_ROUTE) {
     total,
     dest,
     aim: path.find((p) => p.d >= 25) ?? dest, // ponto ~25 m à frente na rota
-    relayout, // chamar após mudar a escala vertical do terreno
+    relayout, // chamar após mudar a escala vertical ou trocar o bloco de terreno
     update(time, camera) {
       // onda de brilho que corre ao longo da rota
       for (const m of arrows) {
