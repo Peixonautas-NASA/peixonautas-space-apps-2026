@@ -1,8 +1,0 @@
-{
-  "name": "@peixonautas/ar-vr",
-  "private": true,
-  "type": "module",
-  "scripts": { "dev": "vite", "build": "vite build", "preview": "vite preview" },
-  "dependencies": { "@peixonautas/shared": "*" },
-  "devDependencies": { "vite": "^6.0.0" }
-}
