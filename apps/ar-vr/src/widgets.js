@@ -283,7 +283,7 @@ export class Map2DWidget extends SpatialWidget {
     const token = (this._token = (this._token || 0) + 1);
     this.viewR = 0;
     // Mesmas camadas do apps/map-2d: Viking MDIM 2.1 + HiRISE de Jezero (opacidade 0,9), sem filtros
-    composeRegionImage(world, box.cx, box.cz, half, { size: 1024, hirise: 'map2d' }).then((img) => {
+    composeRegionImage(world, box.cx, box.cz, half, { size: 1024, hirise: 'map2d', maxTiles: 120 }).then((img) => {
       if (token !== this._token) return;
       const source = `NASA Trek · ${img.sources.join(' + ')}`;
       this.bg = { canvas: img.canvas, minX: box.cx - half, minZ: box.cz - half, size: 2 * half, source };
@@ -314,7 +314,7 @@ export class Map2DWidget extends SpatialWidget {
     const half = need * 2;
     const cx = p.x;
     const cz = p.z;
-    composeRegionImage(this.world, cx, cz, half, { size: 1024, hirise: 'map2d' })
+    composeRegionImage(this.world, cx, cz, half, { size: 1024, hirise: 'map2d', maxTiles: 120 })
       .then((img) => {
         const source = `NASA Trek · ${img.sources.join(' + ')}`;
         this.wide = { canvas: img.canvas, minX: cx - half, minZ: cz - half, size: 2 * half, source };

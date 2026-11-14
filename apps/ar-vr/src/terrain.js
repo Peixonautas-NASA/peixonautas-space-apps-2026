@@ -1,12 +1,12 @@
 // Mundo caminhável em ESCALA REAL (1 unidade = 1 metro) com o mesmo relevo do apps/map-3d:
 // MOLA ClrShade decodificado por cromaticidade (-8,2 a +21,2 km), sombras preenchidas e
-// suavização gaussiana (ver mola.js). Cor: Viking. Em Jezero: detalhe HiRISE perto do usuário.
+// suavização gaussiana (ver mola.js). Cor: Viking. Em Jezero e Gale: detalhe HiRISE perto do usuário.
 //
 // Organização:
 //  - "Bloco" (chunk): 3x3 tiles em z7 (~250 km). É o maior zoom NATIVO do MOLA/Viking no
 //    NASA Trek, então mais zoom não traz informação nova de relevo. Quando a pessoa atravessa
 //    para outro tile, um novo bloco centrado nela é carregado e substitui o anterior.
-//  - "Remendos" HiRISE (só Jezero): texturas de alta resolução misturadas no shader do terreno
+//  - "Remendos" HiRISE (Jezero e Gale): texturas de alta resolução misturadas no shader do terreno
 //    por posição no mundo. Não são malhas extras, então não há z-fighting nem costura.
 //  - Textura procedural de detalhe perto dos pés (não é dado real, só referência visual de
 //    movimento). Pode ser desligada nos ajustes.
@@ -19,10 +19,27 @@ const TREK = 'https://trek.nasa.gov/tiles/Mars/EQ';
 const LAYERS = {
   color: { id: 'Mars_Viking_MDIM21_ClrMosaic_global_232m', ext: 'jpg', maxZ: 7 },
   relief: { id: 'Mars_MGS_MOLA_ClrShade_merge_global_463m', ext: 'jpg', maxZ: 7 },
-  // O mosaico de Jezero tem tiles até z17 (~0,3 m/px).
-  hirise: { id: 'NES_JEZ_MID_Visible_Mosaic_HiRISE_CTX_HRSC_GCS_MARS_07-10-2018', ext: 'png', maxZ: 17 },
 };
-const JEZERO_BOUNDS = { lonMin: 76.79, lonMax: 77.74, latMin: 17.57, latMax: 18.88 };
+// Mosaicos de alta resolução do NASA Trek (cobertura local). A área de cada um vem do
+// WMTSCapabilities.xml do próprio Trek.
+export const HIRISE_MOSAICS = [
+  {
+    // Jezero: HiRISE + CTX + HRSC, tiles até z17 (~0,3 m/px)
+    id: 'NES_JEZ_MID_Visible_Mosaic_HiRISE_CTX_HRSC_GCS_MARS_07-10-2018',
+    ext: 'png',
+    maxZ: 17,
+    label: 'HiRISE/CTX Jezero',
+    bounds: { lonMin: 76.79, lonMax: 77.74, latMin: 17.57, latMax: 18.88 },
+  },
+  {
+    // Gale: mosaico HiRISE da área do Curiosity (camada do bookmark "Curiosity Landing Site"), até z16
+    id: 'curiosity_hirise_mosaic',
+    ext: 'png',
+    maxZ: 16,
+    label: 'HiRISE Curiosity (Gale)',
+    bounds: { lonMin: 137.1224669, lonMax: 137.7298129, latMin: -4.9254743, latMax: -4.2489588 },
+  },
+];
 
 export const MARS_RADIUS_M = 3389500;
 export const M_PER_DEG_LAT = (2 * Math.PI * MARS_RADIUS_M) / 360; // ~59 158 m
@@ -50,7 +67,9 @@ function tileBounds(tx, ty, z) {
   };
 }
 const overlaps = (a, b) => !(a.lonMax < b.lonMin || a.lonMin > b.lonMax || a.latMax < b.latMin || a.latMin > b.latMax);
-export const isInJezero = (lat, lon) => overlaps({ lonMin: lon, lonMax: lon, latMin: lat, latMax: lat }, JEZERO_BOUNDS);
+/** Mosaico HiRISE que cobre o ponto (ou null). */
+export const hiriseMosaicAt = (lat, lon) =>
+  HIRISE_MOSAICS.find((m) => overlaps({ lonMin: lon, lonMax: lon, latMin: lat, latMax: lat }, m.bounds)) ?? null;
 
 const imageCache = new Map();
 function fetchImage(url) {
@@ -87,7 +106,7 @@ function makeCanvas(size) {
 
 /**
  * Imagem REAL do NASA Trek para um quadrado do mundo [cx +- half] x [cz +- half], sem filtros:
- * mosaico Viking MDIM 2.1 e, onde houver cobertura (Jezero), o mosaico HiRISE/CTX/HRSC por cima.
+ * mosaico Viking MDIM 2.1 e, onde houver cobertura (Jezero, Gale), o mosaico HiRISE por cima.
  * Cada camada é baixada no zoom NATIVO que corresponde à resolução pedida (Viking até z7, HiRISE
  * até z17) e desenhada pela posição real dos tiles, sem "zoom esticado" de tile único.
  *  - hirise: 'map2d' = como no apps/map-2d (sobreposto, opacidade 0,9);
@@ -142,11 +161,12 @@ export async function composeRegionImage(world, cx, cz, half, { size = 1024, hir
   const viking = await drawLayer(ctx, LAYERS.color, zFor(LAYERS.color.maxZ));
   const sources = [`Viking MDIM 2.1 z${viking.z}`];
   let mPerPx = ((180 / 2 ** viking.z) * M_PER_DEG_LAT) / TILE;
-  if (overlaps(box, JEZERO_BOUNDS)) {
+  for (const mosaic of HIRISE_MOSAICS) {
+    if (!overlaps(box, mosaic.bounds)) continue;
     const hiCanvas = makeCanvas(size);
     const hiCtx = hiCanvas.getContext('2d');
     hiCtx.imageSmoothingQuality = 'high';
-    const hi = await drawLayer(hiCtx, LAYERS.hirise, zFor(LAYERS.hirise.maxZ));
+    const hi = await drawLayer(hiCtx, mosaic, zFor(mosaic.maxZ));
     if (hi.loaded) {
       ctx.save();
       if (hirise === 'map3d') {
@@ -155,7 +175,7 @@ export async function composeRegionImage(world, cx, cz, half, { size = 1024, hir
       } else ctx.globalAlpha = 0.9;
       ctx.drawImage(hiCanvas, 0, 0);
       ctx.restore();
-      sources.push(`HiRISE/CTX z${hi.z}`);
+      sources.push(`${mosaic.label} z${hi.z}`);
       mPerPx = ((180 / 2 ** hi.z) * M_PER_DEG_LAT) / TILE;
     }
   }
@@ -373,7 +393,7 @@ async function buildChunk(world, tileX, tileY, exag, onProgress) {
 }
 
 // ---------- Remendo HiRISE (textura misturada no shader) ----------
-async function buildHirisePatch(world, lat, lon, zoom, grid) {
+async function buildHirisePatch(world, lat, lon, zoom, grid, mosaic) {
   const half = Math.floor(grid / 2);
   const center = latLonToTile(lat, lon, zoom);
   const size = TILE * grid;
@@ -386,11 +406,11 @@ async function buildHirisePatch(world, lat, lon, zoom, grid) {
     for (let gx = -half; gx <= half; gx++) {
       const tx = center.x + gx;
       const ty = center.y + gy;
-      if (!overlaps(tileBounds(tx, ty, zoom), JEZERO_BOUNDS)) continue;
+      if (!overlaps(tileBounds(tx, ty, zoom), mosaic.bounds)) continue;
       const dx = (gx + half) * TILE;
       const dy = (gy + half) * TILE;
       tasks.push(drawLayerTile(vCtx, LAYERS.color, zoom, tx, ty, dx, dy));
-      tasks.push(drawLayerTile(hCtx, LAYERS.hirise, zoom, tx, ty, dx, dy).then((ok) => (ok ? 1 : 0)));
+      tasks.push(drawLayerTile(hCtx, mosaic, zoom, tx, ty, dx, dy).then((ok) => (ok ? 1 : 0)));
     }
   }
   const results = await Promise.all(tasks);
@@ -495,13 +515,14 @@ export class TerrainWorld {
         .finally(() => (this.loadingChunk = false));
     }
 
-    if (!isInJezero(lat, lon)) return;
+    const mosaic = hiriseMosaicAt(lat, lon);
+    if (!mosaic) return;
     for (const p of this.patches) {
       if (p.loading) continue;
       if (p.cur && Math.hypot(pos.x - p.cur.cx, pos.z - p.cur.cz) < p.recenterDist) continue;
       if (p.failedAt && Math.hypot(pos.x - p.failedAt.x, pos.z - p.failedAt.z) < p.recenterDist) continue;
       p.loading = true;
-      buildHirisePatch(this, lat, lon, p.zoom, p.grid)
+      buildHirisePatch(this, lat, lon, p.zoom, p.grid, mosaic)
         .then((r) => {
           if (!r) {
             p.failedAt = { x: pos.x, z: pos.z };
