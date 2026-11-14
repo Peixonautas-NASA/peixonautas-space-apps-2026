@@ -1,0 +1,44 @@
+{
+  "id": "gale-hrsc-curiosity-30m-v1",
+  "name": "Gale — região do Curiosity e sopé do Monte Sharp",
+  "width": 435,
+  "height": 396,
+  "pixelSizeM": 30,
+  "originX": 8139592.398099138,
+  "originY": -269088.3070835827,
+  "projection": {
+    "radiusM": 3396190,
+    "centralLonDeg": 0,
+    "originLatDeg": 0,
+    "standardParallelDeg": 0
+  },
+  "stepXM": 29.901683878446743,
+  "stepYM": 30,
+  "bounds": {
+    "latMin": -4.7401052864606985,
+    "latMax": -4.539682500746289,
+    "lonMin": 137.319847054449,
+    "lonMax": 137.5400084478474
+  },
+  "source": {
+    "title": "30-m HRSC DTM Mosaic of Gale Crater, Mars",
+    "authors": "Persaud, Putri & Muller (2021)",
+    "doi": "10.5281/zenodo.5808354",
+    "url": "https://zenodo.org/records/5808354/files/hrsc_km09_h1938_h1927_h1916-dtm-mosaic.tif?download=1",
+    "expectedFullSourceMd5": "1d714f2142a56e962d50d985b7088b13",
+    "note": "Source read through HTTP ranges; full-file MD5 was not verified.",
+    "sourceWindow": [
+      2824,
+      3074,
+      3259,
+      3470
+    ],
+    "sourceNoData": -32768,
+    "downloadedRowsSha256": "c6d0ba3667b9d0e72dc14700ddd3c753a9d373e6f87b1ddb6301570313f47958",
+    "terrainReference": "200-m MOLA / HRSC blended global DTM (Fergason et al. 2018)",
+    "createdOn": "2026-11-14"
+  },
+  "validCount": 172260,
+  "minElevationM": -4536,
+  "maxElevationM": -3219.74072265625
+}
