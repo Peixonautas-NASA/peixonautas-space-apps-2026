@@ -19,6 +19,30 @@ seguir a rota sozinho. A rota é uma faixa ciano com setas animadas no chão, qu
 - **Locais:** os mesmos atalhos do mapa 3D. São eles Jezero (pouso do Perseverance), Olympus
   Mons, Valles Marineris e Gale.
 
+## Cratera Gale: relevo real em alta resolução
+
+Gale é o ponto de referência da equipe. Ali, o relevo **não é** a reconstrução por cor do MOLA:
+vem de **DEMs oficiais do USGS**, lidos por partes direto dos arquivos publicados.
+
+| Área | Fonte (oficial) | Resolução usada |
+|---|---|---|
+| 3 × 3 km em volta de (−4,59; 137,44) | [Mars MSL Gale Merged DEM 1m](https://astrogeology.usgs.gov/search/map/mars_msl_gale_merged_dem_1m) (HiRISE) | média de 2 × 2 m |
+| 12 × 12 km em volta do ponto | o mesmo DEM HiRISE | média de 8 × 8 m |
+| a cratera inteira (~210 km) | [MOLA + HRSC Blended DEM Global 200m](https://astrogeology.usgs.gov/search/map/mars_mgs_mola_mex_hrsc_blended_dem_global_200m) | 200 m |
+
+- **Cor:** mosaicos reais do NASA Trek. O **CTX Gale** (~6 m/px) cobre a cratera toda, e o
+  **HiRISE Curiosity** (~1 m/px) a área do rover. Ambos são misturados ao Viking por luminosidade,
+  como no `map-3d`.
+- **Malhas:** perto de você há duas malhas detalhadas, uma de 1,5 km com um vértice a cada 3 m e
+  outra de 12 km com um vértice a cada 30 m. Elas acompanham você. Mais longe fica o bloco de
+  250 km.
+- **Limite:** a exploração fica limitada à cratera, a área com relevo real.
+- **Textura procedural:** em Gale ela começa desligada, porque o detalhe do chão é todo real.
+- **Como os arquivos são gerados:** os arquivos em `public/gale/` (~11 MB) saem de
+  `python tools/build_gale_dem.py`, que usa só a biblioteca padrão do Python. O script lê
+  apenas as janelas necessárias dos GeoTIFFs do USGS (7,6 GB e 11 GB), sem baixar os arquivos
+  inteiros.
+
 ## Como rodar
 
 Você precisa do Node.js 20 ou mais novo.

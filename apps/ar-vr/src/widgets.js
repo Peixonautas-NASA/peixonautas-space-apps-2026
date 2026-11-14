@@ -615,7 +615,7 @@ export class Map3DWidget extends SpatialWidget {
     }
     const G = 129;
     // Relevo: MOLA ClrShade decodificado por cromaticidade (o mesmo do map-3d e da caminhada)
-    const g = sampleHeights(world, box.cx, box.cz, half, G, 400);
+    const g = sampleHeights(world, box.cx, box.cz, half, G, world.dem ? 0 : 400); // DEM real: sem suavizar
     const k = 1 / (2 * half); // m -> unidades da maquete (1 x 1)
     const relief = Math.max(0.5, g.max - g.min);
     this.vex = Math.max(1, Math.min(12, (0.16 * 2 * half) / relief)); // exagero vertical automático
