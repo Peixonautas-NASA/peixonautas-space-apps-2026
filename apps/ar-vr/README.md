@@ -14,6 +14,8 @@ seguir a rota sozinho. A rota é uma faixa ciano com setas animadas no chão, qu
 - **Cor:** mosaico Viking MDIM 2.1. Em Jezero, o mosaico HiRISE/CTX/HRSC entra perto de você,
   com até ~1,3 m/px.
 - **Tecnologia:** Three.js **0.160.0**, a mesma do mapa 3D, servida pelo Vite com HTTPS.
+- **Ponto de partida padrão:** **Cratera Gale (-4,59; 137,44)**, exatamente nessas coordenadas.
+  Os outros locais continuam disponíveis em Ajustes ou pela URL.
 - **Locais:** os mesmos atalhos do mapa 3D. São eles Jezero (pouso do Perseverance), Olympus
   Mons, Valles Marineris e Gale.
 

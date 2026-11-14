@@ -162,7 +162,8 @@ async function init() {
     points = place.route.points.map((p) => world.toWorld(p.lat, p.lon));
     destName = place.route.destName;
   } else {
-    const spot = world.findFlatSpot(0, 0); // evita nascer numa encosta (ex.: parede do cânion)
+    // evita nascer numa encosta (ex.: parede do cânion), exceto quando o ponto exato importa
+    const spot = place.exactStart ? { x: 0, z: 0 } : world.findFlatSpot(0, 0);
     camera.position.set(spot.x, 0, spot.z);
     points = exampleRouteFrom(spot.x, spot.z, world.yawFlattest(spot.x, spot.z));
     destName = 'Destino de exemplo';
