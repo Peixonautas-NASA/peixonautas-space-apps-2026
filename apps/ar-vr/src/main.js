@@ -134,8 +134,8 @@ let route = null;
 // Widgets espaciais: seguem a posição do astronauta, não a rotação da cabeça (ver widgets.js)
 const widgets = new WidgetManager({ scene, camera, dom: renderer.domElement });
 const DEG = Math.PI / 180;
-widgets.add(new Map2DWidget(), { daz: 34 * DEG, el: -13 * DEG }); // à esquerda
-widgets.add(new Map3DWidget(renderer), { daz: -34 * DEG, el: -13 * DEG }); // à direita
+widgets.add(new Map2DWidget(), { daz: 31 * DEG, el: -12 * DEG }); // à esquerda
+widgets.add(new Map3DWidget(renderer), { daz: -31 * DEG, el: -12 * DEG }); // à direita
 if (params.has('debug')) window.__vr = { camera, widgets, walker, look, world }; // testes automatizados
 widgets.onChange = () => {
   ui.map2dBtn.classList.toggle('on', widgets.get('map2d').open);

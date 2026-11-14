@@ -106,11 +106,21 @@ São painéis de vidro que **existem no mundo**, não na tela:
   seu redor, sempre à mesma distância. A posição fica salva no navegador.
 - **No Mapa 3D, arrastar a maquete** faz ela girar, para ver o trajeto de qualquer ângulo.
 - **O X fecha.** O seletor no canto inferior direito reabre.
+- **Dados reais da NASA nos dois mapas.** As camadas são as mesmas do `apps/map-2d` e do
+  `apps/map-3d`: mosaico **Viking MDIM 2.1** e, em Jezero, o mosaico **HiRISE/CTX/HRSC**. O relevo
+  é o **MOLA** decodificado por cromaticidade. Cada camada vem do NASA Trek no zoom nativo
+  adequado: em Jezero, HiRISE z16, com ~1 m/px. Não há filtros nem cores inventadas, e a fonte
+  aparece no canto de cada mapa.
 - **Mapa 2D:** fica centrado em você, com o norte para cima, e se ajusta para a rota inteira
-  sempre caber. Mostra o trecho percorrido (cinza claro), o que falta (ciano), o destino e a sua
+  sempre caber. O HiRISE vai por cima do Viking com opacidade 0,9, como no `map-2d`. Mostra o trecho percorrido (cinza claro), o que falta (ciano), o destino e a sua
   posição, com o cone indicando para onde você olha.
-- **Mapa 3D:** é uma miniatura do terreno ao redor da rota. Ela tem exagero vertical automático,
-  indicado no título, e mostra o trecho percorrido, o destino e você.
+- **Mapa 3D:** é uma miniatura do terreno ao redor da rota, montada com a receita do `map-3d`:
+  - textura Viking com o HiRISE misturado por luminosidade (0,88);
+  - relevo MOLA com suavização gaussiana;
+  - sol a 45° de azimute e 28° de elevação.
+
+  O exagero vertical é automático e aparece no título. A maquete mostra o trecho percorrido, o
+  destino e você.
 
 ### Tela cheia
 
@@ -192,9 +202,10 @@ src/
   é liso, e o detalhe visível é a textura procedural.
 - **Sem curvatura:** o planeta é tratado como plano. Em Marte, o horizonte de uma pessoa de pé
   fica a ~3,4 km. Aqui dá para ver mais longe.
-- **Mapas em miniatura:** usam o mesmo relevo, cuja grade tem um vértice a cada ~650 m. Em
-  rotas curtas e planas, como a de Jezero, a maquete fica quase plana. As cores do Viking passam
-  por um ajuste automático de brilho.
+- **Mapas em miniatura fora de Jezero:** a única textura global é o Viking, com ~325 m/px. Numa
+  rota de ~800 m, isso dá poucos pixels, e o mapa fica quase uniforme. É o dado real disponível.
+  Em Jezero, o HiRISE mostra o chão em detalhe. O relevo tem um vértice a cada ~650 m, então
+  rotas curtas e planas geram uma maquete quase plana.
 - **Andar fisicamente:** hoje o astronauta anda sozinho pela rota. Para andar com passos reais, a próxima
   etapa seria WebXR AR, que funciona no Chrome do Android.
 

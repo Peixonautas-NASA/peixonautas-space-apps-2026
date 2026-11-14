@@ -16,12 +16,13 @@
 //   - X: fecha. O seletor no HUD reabre o painel à frente do olhar.
 import * as THREE from 'three';
 import { yawOfDirection } from './orientation.js';
+import { composeRegionImage } from './terrain.js';
 
 const DEG = Math.PI / 180;
 const STORE_KEY = 'peixonautas.vr.widgets.v1';
 export const RADIUS = 1.45; // m do olho até o painel
-const PANEL_W = 0.58; // m
-const PANEL_H = 0.42;
+const PANEL_W = 0.7; // m
+const PANEL_H = 0.5;
 const EL_MIN = -55 * DEG;
 const EL_MAX = 45 * DEG;
 
@@ -70,34 +71,45 @@ function routeBox(path) {
 }
 
 /** Grade N x N de alturas (m) cobrindo o quadrado [cx +- half] x [cz +- half]. Linha 0 = norte. */
-function sampleHeights(world, cx, cz, half, N, blurPasses = 0) {
-  let h = new Float32Array(N * N);
-  for (let iy = 0; iy < N; iy++) {
-    const z = cz - half + (2 * half * iy) / (N - 1);
-    for (let ix = 0; ix < N; ix++) h[iy * N + ix] = world.heightAt(cx - half + (2 * half * ix) / (N - 1), z);
+function sampleHeights(world, cx, cz, half, N, smoothM = 0) {
+  // Gaussiano separável com raio em metros: tira as "dobras" dos triângulos do bloco (vértices a
+  // ~650 m), como a suavização gaussiana do map-3d. Amostra com margem para não distorcer a borda.
+  const cell = (2 * half) / (N - 1);
+  const sigma = smoothM / cell;
+  const pad = sigma > 0.3 ? Math.min(96, Math.ceil(3 * sigma)) : 0;
+  const P = N + 2 * pad;
+  let a = new Float32Array(P * P);
+  for (let iy = 0; iy < P; iy++) {
+    const z = cz - half + (iy - pad) * cell;
+    for (let ix = 0; ix < P; ix++) a[iy * P + ix] = world.heightAt(cx - half + (ix - pad) * cell, z);
   }
-  // Suaviza as "dobras" dos triângulos do bloco (vértices a ~650 m): só estética da miniatura
-  for (let p = 0; p < blurPasses; p++) {
-    const o = new Float32Array(N * N);
-    for (let iy = 0; iy < N; iy++) {
-      for (let ix = 0; ix < N; ix++) {
-        let s = 0;
-        let c = 0;
-        for (let dy = -1; dy <= 1; dy++) {
-          const y = iy + dy;
-          if (y < 0 || y >= N) continue;
-          for (let dx = -1; dx <= 1; dx++) {
-            const x = ix + dx;
-            if (x < 0 || x >= N) continue;
-            s += h[y * N + x];
-            c++;
-          }
-        }
-        o[iy * N + ix] = s / c;
-      }
+  if (pad) {
+    const kern = [];
+    let ks = 0;
+    for (let i = -pad; i <= pad; i++) {
+      const w = Math.exp(-(i * i) / (2 * sigma * sigma));
+      kern.push(w);
+      ks += w;
     }
-    h = o;
+    const pass = (src, horizontal) => {
+      const out = new Float32Array(P * P);
+      for (let y = 0; y < P; y++) {
+        for (let x = 0; x < P; x++) {
+          let s = 0;
+          for (let i = -pad; i <= pad; i++) {
+            const xx = horizontal ? Math.max(0, Math.min(P - 1, x + i)) : x;
+            const yy = horizontal ? y : Math.max(0, Math.min(P - 1, y + i));
+            s += src[yy * P + xx] * kern[i + pad];
+          }
+          out[y * P + x] = s / ks;
+        }
+      }
+      return out;
+    };
+    a = pass(pass(a, true), false);
   }
+  const h = new Float32Array(N * N);
+  for (let iy = 0; iy < N; iy++) for (let ix = 0; ix < N; ix++) h[iy * N + ix] = a[(iy + pad) * P + ix + pad];
   let min = Infinity;
   let max = -Infinity;
   for (const v of h) {
@@ -105,37 +117,6 @@ function sampleHeights(world, cx, cz, half, N, blurPasses = 0) {
     max = Math.max(max, v);
   }
   return { h, min, max, N, cx, cz, half };
-}
-
-/** Cores do mosaico Viking do bloco atual para o mesmo quadrado (RGBA N x N). */
-function sampleColors(world, cx, cz, half, N) {
-  const c = document.createElement('canvas');
-  c.width = c.height = N;
-  const ctx = c.getContext('2d', { willReadFrequently: true });
-  ctx.fillStyle = '#6b4a36';
-  ctx.fillRect(0, 0, N, N);
-  const chunk = world.chunk;
-  if (chunk?.colorCanvas) {
-    const b = chunk.bounds;
-    const S = chunk.colorCanvas.width;
-    const sx = ((cx - half - b.minX) / (b.maxX - b.minX)) * S;
-    const sy = ((cz - half - b.minZ) / (b.maxZ - b.minZ)) * S;
-    const sw = ((2 * half) / (b.maxX - b.minX)) * S;
-    const sh = ((2 * half) / (b.maxZ - b.minZ)) * S;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(chunk.colorCanvas, sx, sy, sw, sh, 0, 0, N, N);
-  }
-  const data = ctx.getImageData(0, 0, N, N).data;
-  // Níveis automáticos: o mosaico é escuro em alguns lugares (Jezero ~ 65/255); na miniatura vale a forma
-  let sum = 0;
-  for (let i = 0; i < data.length; i += 4) sum += 0.3 * data[i] + 0.59 * data[i + 1] + 0.11 * data[i + 2];
-  const gain = Math.max(1, Math.min(3.5, 150 / (sum / (N * N) || 1)));
-  for (let i = 0; i < data.length; i += 4) {
-    data[i] = Math.min(255, data[i] * gain);
-    data[i + 1] = Math.min(255, data[i + 1] * gain);
-    data[i + 2] = Math.min(255, data[i + 2] * gain);
-  }
-  return data;
 }
 
 function roundRectPath(ctx, x, y, w, h, r) {
@@ -295,53 +276,16 @@ export class Map2DWidget extends SpatialWidget {
   rebuild(world, path) {
     const box = routeBox(path);
     // cobre a vista centrada no astronauta em qualquer ponto da rota
-    const half = Math.max(400, box.diag * 2.6 + 150);
-    const N = 320;
-    const g = sampleHeights(world, box.cx, box.cz, half, N, 1);
-    const col = sampleColors(world, box.cx, box.cz, half, N);
-    const c = document.createElement('canvas');
-    c.width = c.height = N;
-    const ctx = c.getContext('2d');
-    const img = ctx.createImageData(N, N);
-    const cell = (2 * half) / (N - 1);
-    const relief = g.max - g.min;
-    const iv = relief > 2 ? niceStep(relief / 9) : 0; // curvas de nível
-    const lx = -0.6;
-    const lz = -0.6;
-    const ly = 0.55; // luz do noroeste
-    const vex = 3; // só para o sombreado ficar legível
-    for (let iy = 0; iy < N; iy++) {
-      for (let ix = 0; ix < N; ix++) {
-        const i = iy * N + ix;
-        const hx = g.h[iy * N + Math.min(N - 1, ix + 1)] - g.h[iy * N + Math.max(0, ix - 1)];
-        const hz = g.h[Math.min(N - 1, iy + 1) * N + ix] - g.h[Math.max(0, iy - 1) * N + ix];
-        let nx = (-hx * vex) / (2 * cell);
-        let nz = (-hz * vex) / (2 * cell);
-        const nl = Math.hypot(nx, 1, nz);
-        const shade = Math.max(0.35, Math.min(1.25, 0.55 + 0.7 * ((nx * lx + ly + nz * lz) / nl)));
-        let r = col[i * 4] * shade * 0.78;
-        let gg = col[i * 4 + 1] * shade * 0.78;
-        let b = col[i * 4 + 2] * shade * 0.78 + 8;
-        if (iv) {
-          const k = Math.floor(g.h[i] / iv);
-          const kr = Math.floor(g.h[iy * N + Math.min(N - 1, ix + 1)] / iv);
-          const kd = Math.floor(g.h[Math.min(N - 1, iy + 1) * N + ix] / iv);
-          if (k !== kr || k !== kd) {
-            r = r * 0.7 + 62 * 0.3;
-            gg = gg * 0.7 + 230 * 0.3;
-            b = b * 0.7 + 255 * 0.3;
-          }
-        }
-        img.data[i * 4] = r;
-        img.data[i * 4 + 1] = gg;
-        img.data[i * 4 + 2] = b;
-        img.data[i * 4 + 3] = 255;
-      }
-    }
-    ctx.putImageData(img, 0, 0);
-    this.bg = { canvas: c, minX: box.cx - half, minZ: box.cz - half, size: 2 * half, iv };
+    const half = Math.max(600, box.diag * 3.6 + 200); // painel largo: sobra dos lados
+    const token = (this._token = (this._token || 0) + 1);
     this.viewR = 0;
-    this.redraw();
+    // Mesmas camadas do apps/map-2d: Viking MDIM 2.1 + HiRISE de Jezero (opacidade 0,9), sem filtros
+    composeRegionImage(world, box.cx, box.cz, half, { size: 1024, hirise: 'map2d' }).then((img) => {
+      if (token !== this._token) return;
+      this.bg = { canvas: img.canvas, minX: box.cx - half, minZ: box.cz - half, size: 2 * half };
+      this.source = `NASA Trek · ${img.sources.join(' + ')}`;
+      this.redraw();
+    });
   }
 
   tick(dt, nav) {
@@ -378,9 +322,12 @@ export class Map2DWidget extends SpatialWidget {
     if (this.bg) {
       const [x0, y0] = S(this.bg.minX, this.bg.minZ);
       ctx.imageSmoothingQuality = 'high';
-      ctx.globalAlpha = 0.92;
       ctx.drawImage(this.bg.canvas, x0, y0, this.bg.size * s, this.bg.size * s);
-      ctx.globalAlpha = 1;
+    } else {
+      ctx.font = '500 18px system-ui, sans-serif';
+      ctx.fillStyle = 'rgba(220, 240, 255, 0.7)';
+      ctx.textAlign = 'center';
+      ctx.fillText('baixando tiles do NASA Trek…', cx, r.y + 30);
     }
     // anéis de distância
     const ring = niceStep(this.viewR / 2.2);
@@ -494,6 +441,14 @@ export class Map2DWidget extends SpatialWidget {
     ctx.fillStyle = '#dff6ff';
     ctx.textAlign = 'left';
     ctx.fillText(txt, r.x + 21, r.y + r.h - 24);
+    if (this.source) {
+      ctx.font = '500 14px system-ui, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+      ctx.fillText(this.source, r.x + r.w - 11, r.y + r.h - 13);
+      ctx.fillStyle = 'rgba(235, 245, 255, 0.85)';
+      ctx.fillText(this.source, r.x + r.w - 12, r.y + r.h - 14);
+    }
     ctx.restore();
 
     // borda do conteúdo
@@ -548,10 +503,13 @@ export class Map3DWidget extends SpatialWidget {
 
     this.scene3 = new THREE.Scene();
     this.cam3 = new THREE.PerspectiveCamera(30, rtW / rtH, 0.02, 20);
-    this.scene3.add(new THREE.AmbientLight(0xcfeeff, 1.1));
-    const key = new THREE.DirectionalLight(0xffffff, 1.8);
-    key.position.set(-1, 2, 1);
-    this.scene3.add(key);
+    // Luz como no apps/map-3d: sol quente com azimute 45° e elevação 28°, ambiente fraco
+    this.scene3.add(new THREE.AmbientLight(0xffd6ba, 0.55));
+    const sun = new THREE.DirectionalLight(0xfff1e0, 2.2);
+    const el = 28 * DEG;
+    const az = 45 * DEG;
+    sun.position.set(Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az));
+    this.scene3.add(sun);
     this.model = new THREE.Group();
     this.scene3.add(this.model);
 
@@ -596,52 +554,41 @@ export class Map3DWidget extends SpatialWidget {
     for (const c of [...this.model.children]) {
       this.model.remove(c);
       c.geometry?.dispose();
+      c.material?.map?.dispose();
       c.material?.dispose();
     }
     const box = routeBox(path);
     const half = Math.max(350, box.diag * 1.3);
-    const G = 81;
-    const g = sampleHeights(world, box.cx, box.cz, half, G, 2);
-    const col = sampleColors(world, box.cx, box.cz, half, G);
+    const G = 129;
+    // Relevo: MOLA ClrShade decodificado por cromaticidade (o mesmo do map-3d e da caminhada)
+    const g = sampleHeights(world, box.cx, box.cz, half, G, 400);
     const k = 1 / (2 * half); // m -> unidades da maquete (1 x 1)
     const relief = Math.max(0.5, g.max - g.min);
     this.vex = Math.max(1, Math.min(12, (0.16 * 2 * half) / relief)); // exagero vertical automático
-    this.subtitle = `arraste para girar · relevo ${this.vex < 1.05 ? 'real' : `${this.vex.toFixed(1).replace('.', ',')}x`}`;
+    this.subtitle = `arraste para girar · relevo ${this.vex < 1.05 ? 'real 1:1' : `${this.vex.toFixed(1).replace('.', ',')}x`}`;
     const ky = k * this.vex;
     this.grid = { ...g, k, ky };
 
     const geo = new THREE.PlaneGeometry(1, 1, G - 1, G - 1).rotateX(-Math.PI / 2); // linha 0 = norte (-Z)
     const pos = geo.attributes.position;
-    const colors = new Float32Array(pos.count * 3);
-    const holo = new THREE.Color(0x3ee6ff);
-    const c = new THREE.Color();
-    for (let i = 0; i < pos.count; i++) {
-      pos.setY(i, (g.h[i] - g.min) * ky);
-      c.setRGB(col[i * 4] / 255, col[i * 4 + 1] / 255, col[i * 4 + 2] / 255, THREE.SRGBColorSpace);
-      c.lerp(holo, 0.2);
-      colors[i * 3] = c.r;
-      colors[i * 3 + 1] = c.g;
-      colors[i * 3 + 2] = c.b;
-    }
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    for (let i = 0; i < pos.count; i++) pos.setY(i, (g.h[i] - g.min) * ky);
     geo.computeVertexNormals();
-    const terrain = new THREE.Mesh(
-      geo,
-      new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0.94 })
-    );
-    this.model.add(terrain);
-
-    // grade holográfica por cima
-    const wireGeo = new THREE.PlaneGeometry(1, 1, 16, 16).rotateX(-Math.PI / 2);
-    const wp = wireGeo.attributes.position;
-    for (let i = 0; i < wp.count; i++) wp.setY(i, this._yAtModel(wp.getX(i), wp.getZ(i)) + 0.0015);
-    this.model.add(
-      new THREE.LineSegments(
-        new THREE.WireframeGeometry(wireGeo),
-        new THREE.LineBasicMaterial({ color: 0x9ff6ff, transparent: true, opacity: 0.12, depthWrite: false })
-      )
-    );
-    wireGeo.dispose();
+    const mat = new THREE.MeshStandardMaterial({ color: 0x8a6a55, roughness: 0.92, metalness: 0.02 });
+    this.model.add(new THREE.Mesh(geo, mat));
+    // Textura: mesma receita do apps/map-3d (Viking + HiRISE por luminosidade em Jezero), tiles reais
+    const token = (this._token = (this._token || 0) + 1);
+    this.source = 'baixando tiles do NASA Trek…';
+    composeRegionImage(world, box.cx, box.cz, half, { size: 1024, hirise: 'map3d' }).then((img) => {
+      if (token !== this._token) return;
+      const tex = new THREE.CanvasTexture(img.canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 8;
+      mat.map = tex;
+      mat.color.set(0xffffff);
+      mat.needsUpdate = true;
+      this.source = `NASA Trek · MOLA + ${img.sources.join(' + ')}`;
+      this.redraw();
+    });
 
     // laterais da maquete (espessura)
     const skirtPos = [];
@@ -665,7 +612,7 @@ export class Map3DWidget extends SpatialWidget {
     this.model.add(
       new THREE.Mesh(
         skirtGeo,
-        new THREE.MeshBasicMaterial({ color: 0x1b6f86, transparent: true, opacity: 0.55, side: THREE.DoubleSide })
+        new THREE.MeshBasicMaterial({ color: 0x3a2a20, side: THREE.DoubleSide }) // corte do solo
       )
     );
 
@@ -702,6 +649,15 @@ export class Map3DWidget extends SpatialWidget {
 
     this.orbitTarget = new THREE.Vector3(0, ((g.max - g.min) * ky) / 2, 0);
     this.redraw();
+  }
+
+  drawContent(ctx, r) {
+    if (!this.source) return;
+    ctx.font = '500 14px system-ui, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(235, 245, 255, 0.8)';
+    ctx.fillText(this.source, r.x + r.w - 12, r.y + r.h - 12);
   }
 
   _yAtModel(mx, mz) {
