@@ -38,7 +38,7 @@
   <div id="sidebar">
     <div>
       <h2>Relevo 3D Marciano (1:1)</h2>
-      <div class="subtitle">Cromaticidade Invariante + Malha Float32</div>
+      <div class="subtitle">Altimetria MOLA + Malha Float32</div>
     </div>
 
     <div class="card">
@@ -81,7 +81,7 @@
       <label>Elevação Solar: <span id="sunElVal">28°</span></label>
       <input type="range" id="sunElSlider" min="5" max="85" step="1" value="28" />
 
-      <div id="sourceBadge" class="badge fallback">Reconstrução via Cromaticidade MOLA (-8,2 a +21,2 km)</div>
+      <div id="sourceBadge" class="badge fallback">DEM MOLA MEGDR 16 px/° (~3,7 km/px); interpolado</div>
     </div>
 
     <div class="card">
@@ -109,7 +109,7 @@
       <div><strong>Malha Visível:</strong> <span id="hudSpan">-- km × -- km</span></div>
       <div><strong>Elevação Est. no Centro:</strong> <span id="hudElev">-- km</span></div>
       <div><strong>Nível LOD (WMTS):</strong> Zoom <span id="hudZoom">6</span> / 12</div>
-      <div><strong>Fonte Topográfica:</strong> <span id="hudSource">MOLA ClrShade (Cromaticidade)</span></div>
+      <div><strong>Fonte Topográfica:</strong> <span id="hudSource">DEM MOLA MEGDR (carregando)</span></div>
     </div>
   </div>
 
@@ -194,6 +194,7 @@
     });
 
     const terrainMesh = new THREE.Mesh(baseGeometry, material);
+    terrainMesh.visible = false;
     scene.add(terrainMesh);
 
     let currentMeshWidthKm = 100;
@@ -251,6 +252,7 @@
       posAttr.needsUpdate = true;
       baseGeometry.computeVertexNormals();
       baseGeometry.computeBoundingSphere();
+      terrainMesh.visible = true;
     }
 
     function getVerticalExag() {
@@ -274,7 +276,7 @@
       const isRawDem = Boolean(customDemCanvas);
       const smoothRadius = getSmoothRadius(currentZoomLevel, isRawDem);
 
-      if (sourceCanvas) {
+      if (sourceCanvas && (isRawDem || sourceCanvas.molaHeights)) {
         const { macroHeights, heightCanvas, normalCanvas } = computeReliefTextures(
           sourceCanvas,
           isRawDem,
@@ -306,128 +308,72 @@
       rebuildCurrentTerrainMaps();
     };
 
-    // Polilinha aberta em cromaticidade L1 normalizada (cr, cg, cb) — SEM wrap-around de 360° e invariante a sombras
-    const CHROMA_STOPS = [
-      { t: 0.00, c: [0.26, 0.00, 0.74] }, // -8.2 km: Índigo/Violeta
-      { t: 0.14, c: [0.00, 0.22, 0.78] }, // -4.1 km: Azul profundo
-      { t: 0.28, c: [0.00, 0.49, 0.51] }, //  0.0 km: Ciano (Datum)
-      { t: 0.42, c: [0.00, 0.92, 0.08] }, // +4.1 km: Verde
-      { t: 0.56, c: [0.51, 0.49, 0.00] }, // +8.2 km: Amarelo
-      { t: 0.70, c: [0.70, 0.30, 0.00] }, // +12.3 km: Laranja
-      { t: 0.85, c: [1.00, 0.00, 0.00] }, // +16.7 km: Vermelho
-      { t: 0.95, c: [0.68, 0.00, 0.32] }  // +19.7 km: Magenta/Rosa (encostas Tharsis/Olympus)
-    ];
+    // MOLA MEGDR: signed 16-bit meters above the areoid, not RGB hillshade.
+    const MOLA_WIDTH = 5760;
+    const MOLA_HEIGHT = 2880;
+    const MOLA_PPD = 16;
+    let molaPromise = null;
 
-    function decodeClrShadeChromaticity(r, g, b) {
-      const maxC = Math.max(r, g, b);
-      const minC = Math.min(r, g, b);
-      const chroma = maxC - minC;
-      const isBrightWhite = maxC > 195 && minC > 175;
-
-      // Pixels acromáticos (sombras escuras do hillshade ou reflexos brancos) recebem conf = 0 para preenchimento vizinho
-      if (chroma < 14) {
-        return { t: 0.28, conf: 0, isBrightWhite };
+    function loadMolaDem() {
+      if (!molaPromise) {
+        molaPromise = (async () => {
+          // Classic scripts can load adjacent assets under both file: and HTTP.
+          // Fetching a local binary with fetch() is blocked on file: origins.
+          const base64 = await new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = new URL('./data/mola-16ppd.js', document.baseURI).href;
+            script.onload = () => {
+              const payload = globalThis.MOLA_DEM_GZIP_BASE64;
+              delete globalThis.MOLA_DEM_GZIP_BASE64;
+              script.remove();
+              if (typeof payload === 'string') resolve(payload);
+              else reject(new Error('Dados do DEM MOLA ausentes'));
+            };
+            script.onerror = () => {
+              script.remove();
+              reject(new Error('Nao foi possivel abrir data/mola-16ppd.js junto ao HTML'));
+            };
+            document.head.appendChild(script);
+          });
+          const binary = atob(base64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+          const buffer = await new Response(stream).arrayBuffer();
+          if (buffer.byteLength !== MOLA_WIDTH * MOLA_HEIGHT * 2) {
+            throw new Error('Tamanho invalido do DEM MOLA');
+          }
+          return new DataView(buffer);
+        })().catch(error => { molaPromise = null; throw error; });
       }
-
-      const dr = r - minC;
-      const dg = g - minC;
-      const db = b - minC;
-      const sum = dr + dg + db || 1;
-
-      const cr = dr / sum;
-      const cg = dg / sum;
-      const cb = db / sum;
-
-      let bestT = 0.28;
-      let bestDistSq = Infinity;
-
-      for (let i = 0; i < CHROMA_STOPS.length - 1; i++) {
-        const a = CHROMA_STOPS[i].c;
-        const p = CHROMA_STOPS[i + 1].c;
-        const vx = p[0] - a[0];
-        const vy = p[1] - a[1];
-        const vz = p[2] - a[2];
-        const vLenSq = vx * vx + vy * vy + vz * vz || 1;
-
-        let u = ((cr - a[0]) * vx + (cg - a[1]) * vy + (cb - a[2]) * vz) / vLenSq;
-        u = Math.max(0, Math.min(1, u));
-
-        const qx = a[0] + u * vx;
-        const qy = a[1] + u * vy;
-        const qz = a[2] + u * vz;
-        const dSq = (cr - qx) ** 2 + (cg - qy) ** 2 + (cb - qz) ** 2;
-
-        if (dSq < bestDistSq) {
-          bestDistSq = dSq;
-          bestT = CHROMA_STOPS[i].t + u * (CHROMA_STOPS[i + 1].t - CHROMA_STOPS[i].t);
-        }
-      }
-
-      const conf = Math.min(1.0, (chroma - 13) / 42);
-      return { t: bestT, conf, isBrightWhite };
+      return molaPromise;
     }
 
-    // Difusão iterativa para preencher faixas de sombra do hillshade com a altitude das encostas vizinhas
-    function inpaintShadows(heights, confs, brightFlags, w, h, iterations = 6) {
-      let curH = new Float32Array(heights);
-      let curC = new Float32Array(confs);
-      let nextH = new Float32Array(w * h);
-      let nextC = new Float32Array(w * h);
+    function sampleMolaMeters(dem, lat, lon) {
+      // PDS grid starts at 0 E, with samples at cell centers; wrap longitude.
+      const gx = (((lon % 360) + 360) % 360) * MOLA_PPD - 0.5;
+      const gy = Math.max(0, Math.min(MOLA_HEIGHT - 1, (90 - lat) * MOLA_PPD - 0.5));
+      const ix = Math.floor(gx), y0 = Math.floor(gy);
+      const x0 = (ix + MOLA_WIDTH) % MOLA_WIDTH;
+      const x1 = (x0 + 1) % MOLA_WIDTH;
+      const y1 = Math.min(MOLA_HEIGHT - 1, y0 + 1);
+      const fx = gx - ix, fy = gy - y0;
+      const read = (x, y) => dem.getInt16((y * MOLA_WIDTH + x) * 2, false);
+      return (read(x0, y0) * (1 - fx) + read(x1, y0) * fx) * (1 - fy)
+        + (read(x0, y1) * (1 - fx) + read(x1, y1) * fx) * fy;
+    }
 
-      for (let iter = 0; iter < iterations; iter++) {
-        for (let y = 0; y < h; y++) {
-          const ym1 = Math.max(0, y - 1);
-          const yp1 = Math.min(h - 1, y + 1);
-          for (let x = 0; x < w; x++) {
-            const idx = y * w + x;
-            if (curC[idx] > 0.35) {
-              nextH[idx] = curH[idx];
-              nextC[idx] = curC[idx];
-              continue;
-            }
-
-            const xm1 = Math.max(0, x - 1);
-            const xp1 = Math.min(w - 1, x + 1);
-
-            let sumHW = curH[idx] * curC[idx] * 2.0;
-            let sumW = curC[idx] * 2.0;
-
-            const neighbors = [
-              ym1 * w + xm1, ym1 * w + x, ym1 * w + xp1,
-              y * w + xm1,                y * w + xp1,
-              yp1 * w + xm1, yp1 * w + x, yp1 * w + xp1
-            ];
-
-            for (let k = 0; k < 8; k++) {
-              const nIdx = neighbors[k];
-              const wgt = curC[nIdx];
-              if (wgt > 0.01) {
-                sumHW += curH[nIdx] * wgt;
-                sumW += wgt;
-              }
-            }
-
-            if (sumW > 0.001) {
-              nextH[idx] = sumHW / sumW;
-              nextC[idx] = Math.min(0.8, (sumW / 9.0) * 0.9);
-            } else {
-              nextH[idx] = curH[idx];
-              nextC[idx] = curC[idx];
-            }
-          }
-        }
-        [curH, nextH] = [nextH, curH];
-        [curC, nextC] = [nextC, curC];
-      }
-
-      // Eleva cumes brancos APENAS quando a vizinhança já está em alta altitude (Tharsis / Olympus Mons)
-      for (let i = 0; i < w * h; i++) {
-        if (brightFlags[i] && curH[i] > 0.76) {
-          const blend = Math.min(1, (curH[i] - 0.76) / 0.16);
-          curH[i] = curH[i] * (1 - blend) + 1.0 * blend;
+    function buildMolaHeights(dem, w, h, bounds) {
+      const heights = new Float32Array(w * h);
+      for (let y = 0; y < h; y++) {
+        const lat = bounds.latMax - (y + 0.5) / h * (bounds.latMax - bounds.latMin);
+        for (let x = 0; x < w; x++) {
+          const lon = bounds.lonMin + (x + 0.5) / w * (bounds.lonMax - bounds.lonMin);
+          const km = sampleMolaMeters(dem, lat, lon) / 1000;
+          heights[y * w + x] = (km - MOLA_MIN_ELEV_KM) / MOLA_SPAN_KM;
         }
       }
-      return curH;
+      return heights;
     }
 
     // Filtro box separável de 1 passada
@@ -528,7 +474,7 @@
     function computeReliefTextures(elevCanvas, isRawDem, hiriseCanvas, hiriseWeight, worldDispKm, meshWidthKm, meshDepthKm, smoothRadius) {
       const w = elevCanvas.width;
       const h = elevCanvas.height;
-      const eData = elevCanvas.getContext('2d').getImageData(0, 0, w, h).data;
+      const eData = isRawDem ? elevCanvas.getContext('2d').getImageData(0, 0, w, h).data : null;
       const hData = (hiriseWeight > 0 && hiriseCanvas)
         ? hiriseCanvas.getContext('2d').getImageData(0, 0, w, h).data
         : null;
@@ -546,20 +492,14 @@
       const nImg = nCtx.createImageData(w, h);
 
       const rawHeights = new Float32Array(w * h);
-      const confWeights = new Float32Array(w * h);
-      const brightFlags = new Uint8Array(w * h);
       const hiLumArr = hData ? new Float32Array(w * h) : null;
 
       for (let i = 0; i < w * h; i++) {
         if (isRawDem) {
           const lum = (0.299 * eData[i * 4] + 0.587 * eData[i * 4 + 1] + 0.114 * eData[i * 4 + 2]) / 255;
           rawHeights[i] = lum;
-          confWeights[i] = 1.0;
         } else {
-          const { t, conf, isBrightWhite } = decodeClrShadeChromaticity(eData[i * 4], eData[i * 4 + 1], eData[i * 4 + 2]);
-          rawHeights[i] = t;
-          confWeights[i] = conf;
-          brightFlags[i] = isBrightWhite ? 1 : 0;
+          rawHeights[i] = elevCanvas.molaHeights[i];
         }
 
         if (hData && hData[i * 4 + 3] > 20) {
@@ -569,11 +509,7 @@
         }
       }
 
-      const filledHeights = isRawDem
-        ? rawHeights
-        : inpaintShadows(rawHeights, confWeights, brightFlags, w, h, 8);
-
-      const macroHeights = gaussianSmooth3Pass(filledHeights, w, h, smoothRadius);
+      const macroHeights = gaussianSmooth3Pass(rawHeights, w, h, smoothRadius);
 
       for (let i = 0; i < w * h; i++) {
         const byteVal = Math.max(0, Math.min(255, Math.round(macroHeights[i] * 255)));
@@ -663,6 +599,7 @@
 
     let lastLoadedKey = '';
     let loadRequestId = 0;
+    let terrainFocusPending = true;
 
     async function updateDynamicLOD() {
       const distKm = camera.position.distanceTo(controls.target);
@@ -720,12 +657,6 @@
             drawLayerTile(cCtx, 'Mars_Viking_MDIM21_ClrMosaic_global_232m', 'jpg', 7, z, tx, ty, px, py, tileSize)
           );
 
-          if (!customDemCanvas) {
-            tasks.push(
-              drawLayerTile(eCtx, 'Mars_MGS_MOLA_ClrShade_merge_global_463m', 'jpg', 7, z, tx, ty, px, py, tileSize)
-            );
-          }
-
           const b = tileBounds(tx, ty, z);
           if (z >= 8 && overlapsJezero(b)) {
             tasks.push(
@@ -748,7 +679,15 @@
         }
       }
 
-      await Promise.all(tasks);
+      let dem;
+      try {
+        [dem] = await Promise.all([customDemCanvas ? null : loadMolaDem(), ...tasks]);
+      } catch (error) {
+        if (reqId !== loadRequestId) return;
+        lastLoadedKey = '';
+        document.getElementById('status').innerText = 'Falha ao carregar o DEM MOLA. ' + error.message;
+        return;
+      }
       if (reqId !== loadRequestId) return;
 
       const tZoom = Math.max(0, Math.min(1, (continuousZoom - 7.5) / 2.0));
@@ -775,6 +714,12 @@
       const localLonScale = kmPerDegLon(midLat);
       currentMeshWidthKm = spanLon * localLonScale;
       currentMeshDepthKm = spanLat * KM_PER_DEG_LAT;
+      if (dem) {
+        elevCanvas.molaHeights = buildMolaHeights(dem, canvasSize, canvasSize, {
+          lonMin: topLeft.lonMin, lonMax: bottomRight.lonMax,
+          latMin: bottomRight.latMin, latMax: topLeft.latMax
+        });
+      }
       lastElevCanvas = elevCanvas;
       lastHiriseCanvas = hiriseCanvas;
       lastHiriseWeight = hiriseWeight;
@@ -796,6 +741,15 @@
         currentMeshDepthKm,
         smoothRadius
       );
+
+      const focusElevKm = dem ? sampleMolaMeters(dem, focusLat, focusLon) / 1000 : centerElevKm;
+      if (terrainFocusPending) {
+        const targetY = focusElevKm * exag;
+        camera.position.y += targetY - controls.target.y;
+        controls.target.y = targetY;
+        terrainFocusPending = false;
+        controls.update();
+      }
 
       terrainMesh.scale.set(currentMeshWidthKm, 1, currentMeshDepthKm);
       terrainMesh.position.set(
@@ -822,7 +776,7 @@
       document.getElementById('normalPreview').getContext('2d').drawImage(normalCanvas, 0, 0, 110, 110);
 
       document.getElementById('hudSpan').innerText = `${currentMeshWidthKm.toFixed(1)} km × ${currentMeshDepthKm.toFixed(1)} km`;
-      document.getElementById('hudElev').innerText = `${centerElevKm >= 0 ? '+' : ''}${centerElevKm.toFixed(2)} km`;
+      document.getElementById('hudElev').innerText = `${focusElevKm >= 0 ? '+' : ''}${focusElevKm.toFixed(2)} km`;
 
       const badge = document.getElementById('sourceBadge');
       const hudSource = document.getElementById('hudSource');
@@ -832,9 +786,9 @@
         badge.innerText = 'DEM Local Importado (Escala de Cinza Direta)';
         hudSource.innerText = 'DEM Local + Viking/HiRISE';
       } else {
-        badge.className = 'badge fallback';
-        badge.innerText = 'Reconstrução via Cromaticidade MOLA (-8,2 a +21,2 km)';
-        hudSource.innerText = `MOLA ClrShade + ${hiriseWeight > 0 ? 'HiRISE' : 'Viking'} (Zoom ${z})`;
+        badge.className = 'badge dem';
+        badge.innerText = 'DEM MOLA MEGDR 16 px/° (~3,7 km/px); interpolado';
+        hudSource.innerText = `MOLA MEGDR 16 px/° + ${hiriseWeight > 0 ? 'HiRISE' : 'Viking'} (Zoom ${z})`;
       }
 
       document.getElementById('status').innerText = `✅ Malha contínua atualizada (Zoom ${z}).`;
@@ -879,6 +833,7 @@
     window.jumpTo = function (lat, lon, camDistKm = 120) {
       document.getElementById('latInput').value = lat.toFixed(2);
       document.getElementById('lonInput').value = lon.toFixed(2);
+      terrainFocusPending = true;
       anchorLat = lat;
       anchorLon = lon;
       lastLoadedKey = '';
