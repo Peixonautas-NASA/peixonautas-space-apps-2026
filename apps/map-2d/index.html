@@ -322,6 +322,20 @@
       }
     );
 
+    const galeHiRise = createDirectTrekLayer(
+      'hiriseGale',
+      'Alta Resolução Gale (HiRISE Curiosity)',
+      [
+        'https://trek.nasa.gov/tiles/Mars/EQ/curiosity_hirise_mosaic/1.0.0/default/default028mm/{z}/{y}/{x}.png'
+      ],
+      {
+        attribution: 'NASA / JPL / UArizona (HiRISE Curiosity, Gale)',
+        bounds: [[-4.9254743, 137.1224669], [-4.2489588, 137.7298129]],
+        maxNativeZoom: 13,
+        opacity: 0.9
+      }
+    );
+
     const tesDust = createDirectTrekLayer(
       'tesDust',
       'Poeira Atmosférica (TES)',
@@ -333,6 +347,7 @@
 
     vikingColor.addTo(map);
     jezeroHiRise.addTo(map);
+    galeHiRise.addTo(map);
 
     L.control.layers(
       {
@@ -344,6 +359,7 @@
       },
       {
         "Alta Resolução Jezero (HiRISE)": jezeroHiRise,
+        "Alta Resolução Gale (HiRISE Curiosity)": galeHiRise,
         "Poeira Atmosférica (TES Dust)": tesDust
       },
       { collapsed: false }

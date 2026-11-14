@@ -283,7 +283,7 @@ export class Map2DWidget extends SpatialWidget {
     const token = (this._token = (this._token || 0) + 1);
     this.viewR = 0;
     // Mesmas camadas do apps/map-2d: Viking MDIM 2.1 + HiRISE de Jezero (opacidade 0,9), sem filtros
-    composeRegionImage(world, box.cx, box.cz, half, { size: 1024, hirise: 'map2d' }).then((img) => {
+    composeRegionImage(world, box.cx, box.cz, half, { size: 1024, hirise: 'map2d', maxTiles: 120 }).then((img) => {
       if (token !== this._token) return;
       const source = `NASA Trek · ${img.sources.join(' + ')}`;
       this.bg = { canvas: img.canvas, minX: box.cx - half, minZ: box.cz - half, size: 2 * half, source };
@@ -314,7 +314,7 @@ export class Map2DWidget extends SpatialWidget {
     const half = need * 2;
     const cx = p.x;
     const cz = p.z;
-    composeRegionImage(this.world, cx, cz, half, { size: 1024, hirise: 'map2d' })
+    composeRegionImage(this.world, cx, cz, half, { size: 1024, hirise: 'map2d', maxTiles: 120 })
       .then((img) => {
         const source = `NASA Trek · ${img.sources.join(' + ')}`;
         this.wide = { canvas: img.canvas, minX: cx - half, minZ: cz - half, size: 2 * half, source };
@@ -615,7 +615,7 @@ export class Map3DWidget extends SpatialWidget {
     }
     const G = 129;
     // Relevo: MOLA ClrShade decodificado por cromaticidade (o mesmo do map-3d e da caminhada)
-    const g = sampleHeights(world, box.cx, box.cz, half, G, 400);
+    const g = sampleHeights(world, box.cx, box.cz, half, G, world.dem ? 0 : 400); // DEM real: sem suavizar
     const k = 1 / (2 * half); // m -> unidades da maquete (1 x 1)
     const relief = Math.max(0.5, g.max - g.min);
     this.vex = Math.max(1, Math.min(12, (0.16 * 2 * half) / relief)); // exagero vertical automático

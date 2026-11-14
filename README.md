@@ -6,7 +6,7 @@ terreno, rotas e lógica de planejamento:
 
 | Visão | Pasta | Tecnologia | Para quê |
 |---|---|---|---|
-| Mapa 2D | [`apps/map-2d`](apps/map-2d) | a definir | Visão rápida no antebraço, camadas ótica, térmica, elevação, perigos |
+| Mapa 2D | [`apps/map-2d`](apps/map-2d) | a definir | Visão rápida na AR, camadas ótica, térmica, elevação, perigos |
 | Mapa 3D | [`apps/map-3d`](apps/map-3d) | CesiumJS | Terreno 3D, planejamento de rota e briefing |
 | Visão AR/VR | [`apps/ar-vr`](apps/ar-vr) | Three.js + WebXR | HUD do capacete com rota sobreposta ao terreno |
 | Núcleo comum | [`packages/shared`](packages/shared) | a definir | Terreno, rotas, waypoints, alertas |

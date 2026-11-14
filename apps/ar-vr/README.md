@@ -11,11 +11,37 @@ seguir a rota sozinho. A rota é uma faixa ciano com setas animadas no chão, qu
 - **Relevo:** é o mesmo do `apps/map-3d`. A cor do MOLA ClrShade é convertida em elevação por
   cromaticidade, numa faixa de **-8,2 a +21,2 km**. Depois as sombras são preenchidas e o
   resultado passa por uma suavização gaussiana (ver [`src/mola.js`](src/mola.js)).
-- **Cor:** mosaico Viking MDIM 2.1. Em Jezero, o mosaico HiRISE/CTX/HRSC entra perto de você,
-  com até ~1,3 m/px.
+- **Cor:** mosaico Viking MDIM 2.1. Perto de você entra o HiRISE, com até ~1,3 m/px. Em Gale,
+  é o mosaico `curiosity_hirise_mosaic` do NASA Trek; em Jezero, o mosaico HiRISE/CTX/HRSC.
 - **Tecnologia:** Three.js **0.160.0**, a mesma do mapa 3D, servida pelo Vite com HTTPS.
+- **Ponto de partida padrão:** **Cratera Gale (-4,59; 137,44)**, exatamente nessas coordenadas.
+  Os outros locais continuam disponíveis em Ajustes ou pela URL.
 - **Locais:** os mesmos atalhos do mapa 3D. São eles Jezero (pouso do Perseverance), Olympus
   Mons, Valles Marineris e Gale.
+
+## Cratera Gale: relevo real em alta resolução
+
+Gale é o ponto de referência da equipe. Ali, o relevo **não é** a reconstrução por cor do MOLA:
+vem de **DEMs oficiais do USGS**, lidos por partes direto dos arquivos publicados.
+
+| Área | Fonte (oficial) | Resolução usada |
+|---|---|---|
+| 3 × 3 km em volta de (−4,59; 137,44) | [Mars MSL Gale Merged DEM 1m](https://astrogeology.usgs.gov/search/map/mars_msl_gale_merged_dem_1m) (HiRISE) | média de 2 × 2 m |
+| 12 × 12 km em volta do ponto | o mesmo DEM HiRISE | média de 8 × 8 m |
+| a cratera inteira (~210 km) | [MOLA + HRSC Blended DEM Global 200m](https://astrogeology.usgs.gov/search/map/mars_mgs_mola_mex_hrsc_blended_dem_global_200m) | 200 m |
+
+- **Cor:** mosaicos reais do NASA Trek. O **CTX Gale** (~6 m/px) cobre a cratera toda, e o
+  **HiRISE Curiosity** (~1 m/px) a área do rover. Ambos são misturados ao Viking por luminosidade,
+  como no `map-3d`.
+- **Malhas:** perto de você há duas malhas detalhadas, uma de 1,5 km com um vértice a cada 3 m e
+  outra de 12 km com um vértice a cada 30 m. Elas acompanham você. Mais longe fica o bloco de
+  250 km.
+- **Limite:** a exploração fica limitada à cratera, a área com relevo real.
+- **Textura procedural:** em Gale ela começa desligada, porque o detalhe do chão é todo real.
+- **Como os arquivos são gerados:** os arquivos em `public/gale/` (~11 MB) saem de
+  `python tools/build_gale_dem.py`, que usa só a biblioteca padrão do Python. O script lê
+  apenas as janelas necessárias dos GeoTIFFs do USGS (7,6 GB e 11 GB), sem baixar os arquivos
+  inteiros.
 
 ## Como rodar
 
@@ -114,7 +140,7 @@ São painéis de vidro que **existem no mundo**, não na tela:
   - o Mapa 3D refaz a maquete para mostrar você e a rota juntos;
   - quando você volta, a maquete detalhada da rota volta também.
 - **Dados reais da NASA nos dois mapas.** As camadas são as mesmas do `apps/map-2d` e do
-  `apps/map-3d`: mosaico **Viking MDIM 2.1** e, em Jezero, o mosaico **HiRISE/CTX/HRSC**. O relevo
+  `apps/map-3d`: mosaico **Viking MDIM 2.1** e, em Gale e Jezero, o **HiRISE** de cada região. O relevo
   é o **MOLA** decodificado por cromaticidade. Cada camada vem do NASA Trek no zoom nativo
   adequado: em Jezero, HiRISE z16, com ~1 m/px. Não há filtros nem cores inventadas, e a fonte
   aparece no canto de cada mapa.
@@ -164,7 +190,8 @@ src/
   (cada um tem ~83 km), um bloco novo centrado em você é carregado e substitui o anterior.
 - **Altura do chão:** `heightAt(x, z)` reproduz exatamente os triângulos da malha. A câmera
   fica a 1,7 m acima dela, com suavização vertical, e a rota também é desenhada a partir dela.
-- **HiRISE em Jezero:** são dois "remendos" de textura, um em z12 (~13 km, ~10 m/px) e outro em
+- **HiRISE em Gale e Jezero:** a lista fica em `HIRISE_MOSAICS`, em `terrain.js`, com a área de
+  cobertura de cada mosaico. São dois "remendos" de textura, um em z12 (~13 km, ~10 m/px) e outro em
   z15 (~1,6 km, ~1,3 m/px). Eles são misturados no shader do terreno pela posição no mundo e se
   recentralizam conforme você anda. Como não são malhas extras, não há z-fighting nem costura.
 - **Textura de detalhe:** perto dos pés, um ruído procedural escurece e clareia levemente o
@@ -205,13 +232,13 @@ src/
 - **As sombras do Viking são da foto.** O mosaico Viking é uma imagem, com sombras reais
   "gravadas" nela. As paredes de Valles Marineris, por exemplo, aparecem pretas em qualquer
   posição do sol.
-- **Resolução:** fora de Jezero, o dado mais fino tem ~330 m/px. Por isso o chão perto de você
+- **Resolução:** fora das áreas com HiRISE (Gale e Jezero), o dado mais fino tem ~330 m/px. Por isso o chão perto de você
   é liso, e o detalhe visível é a textura procedural.
 - **Sem curvatura:** o planeta é tratado como plano. Em Marte, o horizonte de uma pessoa de pé
   fica a ~3,4 km. Aqui dá para ver mais longe.
-- **Mapas em miniatura fora de Jezero:** a única textura global é o Viking, com ~325 m/px. Numa
+- **Mapas em miniatura fora de Gale e Jezero:** a única textura global é o Viking, com ~325 m/px. Numa
   rota de ~800 m, isso dá poucos pixels, e o mapa fica quase uniforme. É o dado real disponível.
-  Em Jezero, o HiRISE mostra o chão em detalhe. O relevo tem um vértice a cada ~650 m, então
+  Em Gale e Jezero, o HiRISE mostra o chão em detalhe. O relevo tem um vértice a cada ~650 m, então
   rotas curtas e planas geram uma maquete quase plana.
 - **Andar fisicamente:** hoje você anda pelo botão ou pelo piloto automático. Para andar com passos reais, a próxima
   etapa seria WebXR AR, que funciona no Chrome do Android.

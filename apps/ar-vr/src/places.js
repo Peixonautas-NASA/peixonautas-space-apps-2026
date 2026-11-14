@@ -18,9 +18,11 @@ export const PLACES = {
   },
   olympus: { name: 'Olympus Mons (vulcão)', lat: 18.65, lon: -133.8 },
   valles: { name: 'Valles Marineris (cânion)', lat: -13.9, lon: -59.2 },
-  gale: { name: 'Cratera Gale (Monte Sharp)', lat: -4.59, lon: 137.44 },
+  // exactStart: nasce exatamente no ponto (sem procurar o lugar mais plano por perto)
+  // dem: relevo real (DEM HiRISE + HRSC/MOLA) em public/gale/
+  gale: { name: 'Cratera Gale (Monte Sharp)', lat: -4.59, lon: 137.44, exactStart: true, dem: 'gale' },
 };
-export const DEFAULT_PLACE = 'jezero';
+export const DEFAULT_PLACE = 'gale'; // ponto de localização da equipe: Cratera Gale (-4,59; 137,44)
 
 /** Rota de exemplo genérica: ~800 m com uma curva, saindo de (x, z) no rumo `yaw` (o mais plano). */
 export function exampleRouteFrom(x, z, yaw) {
