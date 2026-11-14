@@ -38,6 +38,15 @@ const ui = {
   hudInfo: $('hudInfo'),
   hudSource: $('hudSource'),
   toast: $('toast'),
+  start: $('start'),
+  startPlace: $('startPlace'),
+  startBtn: $('startBtn'),
+  startPlain: $('startPlain'),
+  startNote: $('startNote'),
+  rotateOverlay: $('rotateOverlay'),
+  rotateDismiss: $('rotateDismiss'),
+  installSheet: $('installSheet'),
+  installClose: $('installClose'),
 };
 
 function toast(msg, ms = 3500) {
@@ -155,8 +164,7 @@ async function init() {
   camera.quaternion.setFromEuler(new THREE.Euler(look.dragPitch, look.dragYaw, 0, 'YXZ'));
 
   ui.loading.classList.add('hidden');
-  if (!window.isSecureContext) toast('Página sem HTTPS: sensores indisponíveis. Arraste para olhar.', 6000);
-  else toast('Segure "Andar" para caminhar na direção em que você olha.', 4500);
+  showStart();
 }
 
 init().catch((err) => {
@@ -164,23 +172,112 @@ init().catch((err) => {
   ui.loadingText.textContent = `Erro ao carregar terreno: ${err.message}`;
 });
 
-// ---------- Botões ----------
-ui.sensorsBtn.addEventListener('click', async () => {
-  if (look.sensorsActive) {
-    look.disableSensors();
-    ui.sensorsBtn.textContent = 'Ativar sensores';
-    ui.sensorsBtn.classList.remove('on');
-    return;
+// ---------- Plataforma: tela cheia, app instalado, orientação ----------
+const isIOS = /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isInstalledApp =
+  window.matchMedia('(display-mode: fullscreen)').matches ||
+  window.matchMedia('(display-mode: standalone)').matches ||
+  navigator.standalone === true;
+const isTouch = window.matchMedia('(pointer: coarse)').matches;
+const canFullscreen = Boolean(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+const isPortrait = () => window.innerHeight > window.innerWidth;
+
+function isFullscreen() {
+  return Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+}
+/** Entra em tela cheia e trava na horizontal (Android). Chamar dentro de um toque do usuário. */
+async function enterFullscreen() {
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!req) {
+    if (isIOS && !isInstalledApp) ui.installSheet.hidden = false;
+    return false;
   }
+  await req.call(el, { navigationUI: 'hide' });
+  try {
+    await screen.orientation?.lock?.('landscape');
+  } catch {
+    /* alguns navegadores não deixam travar; o aviso de "deite o celular" cobre isso */
+  }
+  return true;
+}
+async function exitFullscreen() {
+  const exit = document.exitFullscreen || document.webkitExitFullscreen;
+  if (exit && isFullscreen()) await exit.call(document);
+}
+function syncFullscreenUi() {
+  // Já instalado como app (tela cheia nativa): o botão não é necessário
+  ui.fullscreenBtn.hidden = isInstalledApp && !canFullscreen;
+  ui.fullscreenBtn.classList.toggle('on', isFullscreen() || isInstalledApp);
+}
+ui.fullscreenBtn.addEventListener('click', async () => {
+  try {
+    if (isFullscreen()) await exitFullscreen();
+    else await enterFullscreen();
+  } catch (err) {
+    toast(`Tela cheia falhou: ${err.message}`);
+  }
+});
+ui.installClose.addEventListener('click', () => (ui.installSheet.hidden = true));
+
+// ---------- Sensores ----------
+async function turnSensorsOn() {
   try {
     look.pendingRecenter = null; // mantém a direção para onde a pessoa já está olhando
     await look.enableSensors();
-    ui.sensorsBtn.textContent = 'Sensores ✓';
     ui.sensorsBtn.classList.add('on');
     navigator.wakeLock?.request('screen').catch(() => {});
+    return true;
   } catch (err) {
     toast(err.message, 5000);
+    return false;
   }
+}
+ui.sensorsBtn.addEventListener('click', () => {
+  if (look.sensorsActive) {
+    look.disableSensors();
+    ui.sensorsBtn.classList.remove('on');
+    toast('Sensores desligados: arraste a tela para olhar.', 2500);
+  } else turnSensorsOn();
+});
+
+// ---------- Tela de entrada: um toque = tela cheia + horizontal + sensores ----------
+let started = false;
+function showStart() {
+  ui.startPlace.textContent = place.name;
+  if (!canFullscreen) {
+    ui.startPlain.hidden = true;
+    if (isInstalledApp) ui.startNote.textContent = 'Liga os sensores de movimento. Segure o celular na horizontal.';
+    else if (isIOS) ui.startNote.textContent = 'No iPhone, a tela cheia vem ao instalar como app (o botão ⛶ explica como).';
+    else ui.startNote.textContent = 'Liga os sensores de movimento.';
+  }
+  if (!isTouch) {
+    ui.startNote.textContent = 'No computador: arraste para olhar e use W/A/S/D para andar.';
+    ui.startPlain.hidden = true;
+  }
+  ui.start.hidden = false;
+}
+function begin({ fullscreen }) {
+  if (started) return;
+  started = true;
+  ui.start.hidden = true;
+  // Tudo disparado no mesmo toque (o iOS exige o gesto para pedir permissão dos sensores)
+  if (isTouch || isIOS) turnSensorsOn();
+  if (fullscreen && canFullscreen && isTouch) enterFullscreen().catch(() => {});
+  updateRotateOverlay();
+  setTimeout(() => toast('Segure ⬆ Andar para caminhar na direção em que você olha.', 4500), 600);
+}
+ui.startBtn.addEventListener('click', () => begin({ fullscreen: true }));
+ui.startPlain.addEventListener('click', () => begin({ fullscreen: false }));
+
+// Celular em pé: pede para deitar (dá para dispensar)
+let portraitOk = false;
+function updateRotateOverlay() {
+  ui.rotateOverlay.hidden = !(started && isTouch && isPortrait() && !portraitOk && !stereoOn);
+}
+ui.rotateDismiss.addEventListener('click', () => {
+  portraitOk = true;
+  updateRotateOverlay();
 });
 
 ui.recenterBtn.addEventListener('click', () => look.recenter(aimYaw()));
@@ -208,32 +305,6 @@ renderer.domElement.addEventListener('pointerdown', () => {
   })
 );
 
-function isFullscreen() {
-  return Boolean(document.fullscreenElement || document.webkitFullscreenElement);
-}
-async function enterFullscreen() {
-  const el = document.documentElement;
-  const req = el.requestFullscreen || el.webkitRequestFullscreen;
-  if (!req) {
-    toast('Tela cheia não suportada aqui. No iPhone: Compartilhar → "Adicionar à Tela de Início".', 6000);
-    return false;
-  }
-  await req.call(el);
-  return true;
-}
-async function exitFullscreen() {
-  const exit = document.exitFullscreen || document.webkitExitFullscreen;
-  if (exit && isFullscreen()) await exit.call(document);
-}
-ui.fullscreenBtn.addEventListener('click', async () => {
-  try {
-    if (isFullscreen()) await exitFullscreen();
-    else await enterFullscreen();
-  } catch (err) {
-    toast(`Tela cheia falhou: ${err.message}`);
-  }
-});
-
 async function setStereo(on) {
   stereoOn = on;
   look.dragEnabled = !on;
@@ -242,21 +313,21 @@ async function setStereo(on) {
   if (on) {
     try {
       if (!isFullscreen()) await enterFullscreen();
-      await screen.orientation?.lock?.('landscape');
     } catch {
-      /* iOS não deixa travar a orientação: basta virar o celular */
+      /* segue sem tela cheia */
     }
     toast('Estéreo: segure a tela (ou o botão do Cardboard) para andar.');
-    if (!look.sensorsActive) setTimeout(() => toast('Dica: ative os sensores antes do modo estéreo.'), 3600);
-  } else {
-    screen.orientation?.unlock?.();
+    if (!look.sensorsActive) setTimeout(() => toast('Dica: ative os sensores (🧭) antes do modo estéreo.'), 3600);
   }
   onResize();
 }
 ui.stereoBtn.addEventListener('click', () => setStereo(true));
 ui.exitStereo.addEventListener('pointerdown', (e) => e.stopPropagation());
 ui.exitStereo.addEventListener('click', () => setStereo(false));
-if (params.has('estereo')) setStereo(true); // atalho para testar no PC
+if (params.has('estereo')) {
+  started = true;
+  setStereo(true); // atalho para testar no PC
+}
 
 // ---------- Ajustes ----------
 ui.settingsBtn.addEventListener('click', () => ui.settings.classList.toggle('open'));
@@ -293,13 +364,19 @@ function onResize() {
   const w = window.innerWidth;
   const h = window.innerHeight;
   camera.aspect = w / h; // o StereoEffect já usa metade da largura por olho
+  // Deitado (modo principal) o campo de visão horizontal fica largo: reduz o vertical para não distorcer
+  camera.fov = w > h ? 55 : 70;
   camera.updateProjectionMatrix();
+  updateRotateOverlay();
+  syncFullscreenUi();
   renderer.setSize(w, h);
   stereo.setSize(w, h);
 }
 window.addEventListener('resize', onResize);
 screen.orientation?.addEventListener?.('change', onResize);
 document.addEventListener('fullscreenchange', onResize);
+document.addEventListener('webkitfullscreenchange', onResize);
+onResize();
 
 // ---------- HUD ----------
 const fwd = new THREE.Vector3();

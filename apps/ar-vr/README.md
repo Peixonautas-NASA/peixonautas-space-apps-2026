@@ -1,4 +1,4 @@
-# Visão VR (v0.2): caminhar em Marte pelo celular
+# Visão VR (v0.3): caminhar em Marte pelo celular, deitado e em tela cheia
 
 Você fica de pé no terreno marciano em **escala real (1:1)**, na altura dos olhos (1,7 m).
 Girando o celular, a câmera gira junto. **Segurando o botão "Andar"**, você caminha na direção
@@ -75,20 +75,36 @@ para andar. **Shift** deixa 5x mais rápido. Alguns parâmetros de URL úteis:
 - `?local=olympus`, `?local=valles`, `?local=gale` ou `?local=jezero` escolhem o local;
 - `?estereo=1` abre direto no modo estéreo.
 
-## Como usar
+## Como usar (celular deitado)
 
-| Controle | O que faz |
-|---|---|
-| **⬆ Andar** (segure) | Anda na direção em que você olha. No **modo estéreo**, segurar em qualquer ponto da tela (ou o botão do Cardboard) também anda. |
-| **🚶 / 🚙 / 🚀** | Troca a velocidade: caminhada (1,4 m/s), rover (15 m/s) ou rápido (300 m/s). Em escala real, as distâncias são enormes: o Olympus Mons tem ~600 km de largura. |
-| **Ativar sensores** | Liga o giroscópio. No iOS, isso chama `DeviceOrientationEvent.requestPermission()`. |
-| **Recentralizar** | Alinha a direção atual do celular com o próximo trecho da rota. |
-| **Tela cheia** | Funciona no Android e no iPad. No iPhone, use Compartilhar → **Adicionar à Tela de Início**. |
-| **Estéreo** | Tela dividida para Cardboard (separação de 64 mm entre os olhos). |
-| ⚙ | Local, escala vertical (1,0x = real, como no mapa 3D), resposta dos sensores e textura de detalhe. |
+A Visão VR foi feita para usar **na horizontal**. Ao abrir, toque em **▶ Entrar**: esse único
+toque liga a **tela cheia**, trava a orientação na **horizontal** (no Android) e ativa os
+**sensores**. Se o celular estiver em pé, aparece um aviso pedindo para deitar, que dá para
+dispensar.
 
-O HUD mostra a distância até o destino, para que lado virar, o rumo, a elevação em que você
-está e quanto já andou.
+| Onde | Controle | O que faz |
+|---|---|---|
+| polegar direito | **⬆ Andar** (segure) | Anda na direção em que você olha. No modo estéreo, segurar qualquer ponto da tela (ou o botão do Cardboard) também anda. |
+| polegar esquerdo | **🚶 / 🚙 / 🚀** | Troca a velocidade: caminhada (1,4 m/s), rover (15 m/s) ou rápido (300 m/s). |
+| polegar esquerdo | **🎯 Rota** | Alinha a direção atual do celular com o próximo trecho da rota. |
+| canto superior | **⛶** | Liga ou desliga a tela cheia. No iPhone, explica como instalar como app. |
+| canto superior | **🧭** | Liga ou desliga os sensores (no iOS, pede permissão). |
+| canto superior | **👓** | Modo estéreo para Cardboard. |
+| canto superior | **⚙** | Local, escala vertical (1,0x = real), resposta dos sensores e textura de detalhe. |
+
+### Tela cheia
+
+- **Android (Chrome):** o ▶ Entrar ou o ⛶ já entram em tela cheia e travam na horizontal. Também
+  dá para instalar (menu ⋮ → **Instalar app** ou **Adicionar à tela inicial**). O app instalado
+  já abre em tela cheia e na horizontal, configurado pelo `public/manifest.webmanifest`.
+- **iPhone (Safari):** o Safari **não permite tela cheia** em páginas comuns. O caminho é
+  instalar como app: Compartilhar → **Adicionar à Tela de Início** → abrir pelo ícone
+  **Peixonautas VR**. Assim ele abre sem as barras do Safari, e na horizontal a barra de status
+  também some. Para instalar, prefira o link do **túnel** (opção B), que tem certificado
+  válido. Com o certificado autoassinado da rede local, o app instalado pode não abrir.
+
+O HUD no topo mostra a distância até o destino, para que lado virar, o rumo, a elevação e
+quanto você já andou.
 
 ## Como funciona
 
