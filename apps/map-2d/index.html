@@ -37,6 +37,12 @@
     #routePanel label { display: block; margin-top: 8px; font-size: 12px; }
     #routePanel a { color: #58a6ff; }
     #routeStatus, #routeMetrics, #routeEndpoints { margin-top: 10px; line-height: 1.6; }
+    #sidebar input[type="checkbox"] { width: auto; margin-right: 6px; }
+    #traversabilityEditor { margin-top: 12px; border-top: 1px solid #30363d; padding-top: 10px; }
+    #annotationStatus { margin: 8px 0; font-size: 12px; line-height: 1.5; }
+    #annotationList { padding: 0; list-style: none; }
+    #annotationList li { border: 1px solid #414a56; border-radius: 6px; padding: 8px; margin-top: 8px; }
+    #annotationList .annotation-title { display: block; margin-bottom: 4px; }
     .route-point { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; border: 2px solid white; color: white; font-weight: 700; box-shadow: 0 2px 6px #000; }
     .route-point-a { background: #16803c; }
     .route-point-b { background: #1f6feb; }
@@ -89,11 +95,59 @@
       <label>Inclinação máxima da grade (graus)
         <input id="routeMaxSlope" type="number" min="1" max="60" step="1" value="25" />
       </label>
+      <details id="traversabilityEditor">
+        <summary>Transitabilidade manual</summary>
+        <label><input id="useTraversability" type="checkbox" />Usar áreas manuais no cálculo</label>
+        <p class="subtitle">Interpretação manual, não medição de sensor. Fora das áreas classificadas, o terreno é desconhecido. Nada aqui confirma ausência de obstáculos.</p>
+        <label>Peso da transitabilidade
+          <input id="weightTerrain" type="number" min="0" max="100" step="0.5" value="1" />
+        </label>
+        <label>Custo adicional por metro em terreno difícil
+          <input id="difficultCost" type="number" min="0" max="100" step="0.5" value="3" />
+        </label>
+        <label>Terreno desconhecido
+          <select id="unknownPolicy">
+            <option value="penalize">Penalizar</option>
+            <option value="allow">Permitir sem custo adicional</option>
+            <option value="block">Bloquear</option>
+          </select>
+        </label>
+        <label>Custo adicional por metro desconhecido
+          <input id="unknownCost" type="number" min="0" max="100" step="0.5" value="1" />
+        </label>
+        <label>Margem das áreas classificadas Bloqueada (m)
+          <input id="blockedMargin" type="number" min="0" max="10000" step="1" value="60" />
+        </label>
+        <p class="subtitle">A margem e as células tocadas são bloqueadas de forma conservadora. Em grades grosseiras, o desvio pode ser muito maior que a área desenhada.</p>
+        <label>Classificação da nova área
+          <select id="annotationType">
+            <option value="blocked">Bloqueada — vermelho</option>
+            <option value="difficult">Difícil — laranja</option>
+            <option value="normal">Normal — verde</option>
+            <option value="unknown">Desconhecida — amarelo</option>
+          </select>
+        </label>
+        <label>Nome da área (opcional)
+          <input id="annotationLabel" type="text" maxlength="80" placeholder="Ex.: dunas interpretadas em imagem" />
+        </label>
+        <button id="drawAnnotation" type="button" class="preset-btn" aria-pressed="false">Desenhar área no mapa</button>
+        <div class="route-controls">
+          <button id="finishAnnotation" type="button" disabled>Concluir área</button>
+          <button id="undoAnnotationVertex" type="button" class="preset-btn" disabled>Desfazer vértice</button>
+          <button id="cancelAnnotation" type="button" class="preset-btn" disabled>Cancelar</button>
+        </div>
+        <div id="annotationStatus" role="status" aria-live="polite">Nenhuma área manual.</div>
+        <ul id="annotationList"></ul>
+        <button id="exportAnnotations" type="button" class="preset-btn">Exportar áreas e política</button>
+        <label>Importar áreas de Marte (substitui as atuais)
+          <input id="importAnnotations" type="file" accept=".json,.geojson,application/json,application/geo+json" />
+        </label>
+      </details>
       <button id="calculateRoute" type="button">Calcular rota A → B</button>
       <button class="preset-btn" id="exportRoute" type="button" disabled>Exportar GeoJSON</button>
       <div id="routeStatus" role="status" aria-live="polite">Preparando terreno...</div>
       <div id="routeMetrics"></div>
-      <p class="subtitle">Pesos e limite são hipóteses ajustáveis do protótipo. Sem dados locais de areia, blocos ou clima no custo. A resolução escolhida limita o detalhe das inclinações e dos obstáculos; não é validação de segurança operacional.</p>
+      <p class="subtitle">Pesos e limite são hipóteses ajustáveis do protótipo. Áreas manuais entram somente quando ativadas; não há classificação automática de solo ou clima no custo. A resolução escolhida limita o detalhe das inclinações e dos obstáculos; não é validação de segurança operacional.</p>
       <a id="terrainSourceLink" href="https://zenodo.org/records/5808354" target="_blank" rel="noopener noreferrer">Fonte do terreno</a>
     </div>
 
@@ -450,6 +504,7 @@
   </script>
   <script src="../../packages/shared/navigation/planner.js"></script>
   <script src="../../data/gale/terrain.js"></script>
+  <script src="traversability-editor.js"></script>
   <script src="route-planner.js"></script>
 </body>
 </html>

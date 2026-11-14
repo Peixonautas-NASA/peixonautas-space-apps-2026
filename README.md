@@ -54,6 +54,20 @@ condições operacionais. Pesos e limites são hipóteses ajustáveis.
 - [Fonte, recorte e preparação do DTM](data/gale/README.md)
 - [Algoritmo, fórmula de custo e testes](packages/shared/navigation/README.md)
 
+## Transitabilidade manual
+
+No painel de rotas, abra **Transitabilidade manual**, escolha uma classificação,
+clique em **Desenhar área no mapa**, marque pelo menos três vértices e use
+**Concluir área**. Ative **Usar áreas manuais no cálculo** e recalcule a rota.
+Bloqueada impede passagem; Difícil acrescenta custo; Normal classifica uma área
+conhecida por interpretação; Desconhecida segue a política selecionada.
+O restante do terreno também é desconhecido quando a camada está ativa.
+
+As áreas e configurações ficam salvas no navegador e podem ser exportadas e
+importadas. Mudar uma área ou custo invalida a rota antiga. São interpretações
+manuais, não medições de solo; células tocadas e margens de bloqueio são tratadas
+conservadoramente. [Regras e testes](packages/shared/navigation/README.md).
+
 ## Equipe
 
 Peixonautas: adicione aqui os nomes e papéis.

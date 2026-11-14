@@ -25,6 +25,7 @@ s = max(source terrain slope, destination terrain slope, segment slope)
 cost = d × distanceWeight
      + d × slopeWeight × (s / 15°)²
      + max(0, dz) × ascentWeight
+     + d × terrainWeight × max(terrainPenaltyAtSource, terrainPenaltyAtDestination)
 ```
 
 The 15° divisor is a fixed normalization reference, not a safe-travel threshold.
@@ -41,6 +42,58 @@ graph and this cost model, not necessarily in continuous terrain. The UI
 renders every path cell without route smoothing that could cross hazards.
 No data from normal maps, vertical exaggeration or optical brightness enters
 the cost.
+
+## Manual traversability
+
+**IMPLEMENTADO:** optional manual polygons for `blocked`, `difficult`, `normal`
+and `unknown` terrain. The layer is off by default, preserving the existing
+route until explicitly enabled. On activation, unclassified cells are unknown;
+they are not silently considered normal. The unknown policy is `allow`,
+`penalize` (default, extra cost 1/m) or `block`. Difficult cells default to an
+additional cost 3/m. The terrain weight defaults to 1 and may be zero, but a
+zero weight never disables hard blocks or the unknown/block policy.
+
+Pass `annotations: [{id, label, type, ring: [[lon,lat], ...]}]` and
+`traversability: {enabled, difficultCost, unknownCost, unknownPolicy, marginM}`
+on a georeferenced grid (projection, originX/Y and pixelSizeM are required).
+The worker rasterizes vectors anew for each grid, so source/resolution changes
+do not reuse masks aligned to an old AOI. `rasterizeAnnotations` is also exported
+for inspection/tests. `terrainCostPerM` is an optional cell-aligned nonnegative
+cost array for direct API consumers.
+
+Every cell touched by a polygon is classified, including thin polygons with
+no cell center inside. Explicit blocked polygons dominate overlaps. Otherwise
+overlapping classifications use the highest applicable extra cost; explicit
+unknown/block is always a hard constraint. Normal polygons override the default
+unclassified/unknown state, but cannot erase an explicit blocked polygon.
+To remove a block, change or delete that polygon.
+
+The default 60-m margin applies only to explicitly blocked polygons. Cells
+intersecting the polygon or its conservative axis-aligned metric expansion are
+blocked. This approximates a minimum setback; square expansion and whole cells
+can block more than a Euclidean circular buffer, particularly on coarse DTMs.
+Unknown/block and DEM NoData remain hard constraints without this additional
+polygon margin. Annotations never change the numeric elevation or its gradients.
+
+The extra edge cost is `distance × terrainWeight × max(endpoint penalties)`.
+It is nonnegative, preserving the heuristic lower bound. The result includes
+`costParts.terrain`, the applied policy, manual provenance, grid classification
+counts and approximate route distances by class. Edges straddling classes are
+assigned conservatively to the higher-ranked class. These are not measurements
+of soil bearing strength, energy consumption or time.
+
+The UI supports polygon drawing, vertex undo, cancellation, reclassification,
+deletion, browser-local persistence and import/export of Mars-tagged planetary
+GeoJSON-shaped collections. Layer enablement, policy and terrain weight are
+saved per browser origin. File mode and the HTTP service have separate storage;
+use export/import to transfer interpretations. Invalid imports leave existing
+areas intact. Imports explicitly replace areas and policy; they never establish
+sensor provenance. Route exports include the areas/policy and complete weights.
+
+Only simple polygons without holes are supported: 50 areas, 128 vertices per
+area, 2,048 vertices total, latitude ±75°, longitude ±180°, no antimeridian crossing.
+Self-intersections, duplicate IDs, invalid coordinates and negative costs fail
+explicitly. Limits bound worker processing and imported-file size (1 MB).
 
 ## Interface and behavior
 
@@ -71,15 +124,16 @@ Properties carry source, resolution, weights, costs and limitations. Cost is
 a comparative score, not time, energy or physical risk. Distance is horizontal;
 ascent/descent accumulate differences between consecutive DEM samples.
 
-No local soil, rock, thermal, weather, radiation or life-support data has been
-added to the cost. Future layers should distinguish impassable constraints
+Manual interpretations can supply assumed terrain costs and hard exclusions,
+but no sensor-derived local soil, rock, thermal, weather, radiation or life-support
+data has been added. Future layers should distinguish impassable constraints
 from soft nonnegative costs, with source, resolution, validity and date. A
 resource target should not override a hard movement constraint.
 
 ## Validation
 
 ```powershell
-node --test packages/shared/navigation/tests/planner.cjs
+node --test packages/shared/navigation/tests/*.cjs
 ```
 
 Tests cover exact flat-grid distance, weight-induced detours, directional
@@ -93,6 +147,7 @@ Browser checks require an isolated Chromium/Edge session with
 ```powershell
 node apps/map-2d/tests/pathfinding.cjs
 node apps/map-2d/tests/rendering.cjs
+node apps/map-2d/tests/traversability.cjs
 ```
 
 An optional URL argument to `pathfinding.cjs` checks the HTTP-hosted version;
@@ -100,3 +155,9 @@ the default checks opening the HTML directly. The browser tests exercise real
 workers, invalid input, weight changes, cancellation, A/B selection, export,
 tile failures and recovery. NASA imagery still needs network access, while
 the bundled terrain and route calculation do not.
+
+The traversability browser test also accepts an HTTP URL argument and covers
+drawing, hard/soft detours, weight zero, unknown blocking, reload persistence,
+atomic import/rejection, deletion, provenance and interaction with A/B selection.
+AI assistance record (2026-11-14): Codex assisted with the manual interpretation
+layer, conservative rasterization, cost integration, persistence and tests.

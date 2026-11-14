@@ -17,7 +17,7 @@
   const areaRectangle = L.rectangle(bounds, { color: '#ffb454', weight: 2, dashArray: '6 6', fillOpacity: 0.025, interactive: false }).addTo(map);
   const markers = {};
   const endpoints = {};
-  let selecting = null, routeLine = null, worker = null, requestId = 0, lastResult = null, controller = null;
+  let selecting = null, routeLine = null, worker = null, requestId = 0, lastResult = null, controller = null, editor = null;
   const automatic = () => element('terrainMode').value === 'auto';
 
   function clearResult() {
@@ -35,6 +35,7 @@
   }
 
   function setSelection(which) {
+    if (which) editor?.cancelDrawing();
     selecting = selecting === which ? null : which;
     element('selectRouteA').setAttribute('aria-pressed', String(selecting === 'A'));
     element('selectRouteB').setAttribute('aria-pressed', String(selecting === 'B'));
@@ -64,7 +65,7 @@
           iconSize: [28, 28], iconAnchor: [14, 14] }),
         title: 'Ponto ' + which
       }).addTo(map);
-      markers[which].on('dragstart', clearResult);
+      markers[which].on('dragstart', () => { editor?.cancelDrawing(); clearResult(); });
       markers[which].on('dragend', event => {
         const p = event.target.getLatLng();
         setEndpoint(which, p.lat, p.lng);
@@ -110,18 +111,19 @@
   }
 
   function readWeights() {
-    const controls = ['weightDistance', 'weightSlope', 'weightAscent', 'routeMaxSlope'];
+    editor.getSnapshot();
+    const controls = ['weightDistance', 'weightSlope', 'weightAscent', 'weightTerrain', 'routeMaxSlope'];
     for (const id of controls) {
       if (!element(id).checkValidity() || element(id).value.trim() === '') throw new Error('Revise os pesos e o limite de inclinação.');
     }
     return { distance: Number(element('weightDistance').value), slope: Number(element('weightSlope').value),
-      ascent: Number(element('weightAscent').value), maxSlopeDeg: Number(element('routeMaxSlope').value) };
+      ascent: Number(element('weightAscent').value), terrain: Number(element('weightTerrain').value), maxSlopeDeg: Number(element('routeMaxSlope').value) };
   }
 
   function showResult(result) {
     const messages = {
       'outside-area': 'Um dos pontos está fora do terreno carregado.',
-      'invalid-endpoint': 'Um dos pontos não tem suporte de elevação suficiente ou excede o limite de inclinação.',
+      'invalid-endpoint': 'Um dos pontos está bloqueado pela política manual, não tem suporte de elevação ou excede o limite de inclinação.',
       'no-path': 'Nenhuma rota encontrada dentro deste recorte com o limite escolhido. Isso não exclui desvios fora da área.'
     };
     if (result.status !== 'ok') { status(messages[result.status] || 'Não foi possível calcular a rota.'); return; }
@@ -138,7 +140,9 @@
       + ' | Inclinação máxima estimada: ' + format(result.maxSlopeDeg) + '°'
       + ' | Custo ponderado: ' + format(result.cost)
       + ' (distância ' + format(result.costParts.distance) + ', inclinação ' + format(result.costParts.slope)
-      + ', subida ' + format(result.costParts.ascent) + ').';
+      + ', subida ' + format(result.costParts.ascent) + ', transitabilidade ' + format(result.costParts.terrain || 0) + ').'
+      + (result.traversability?.enabled ? ' Camada manual ativa: ' + format(result.traversability.classDistanceM.difficult / 1000)
+        + ' km difíceis; ' + format(result.traversability.classDistanceM.unknown / 1000) + ' km desconhecidos.' : ' Camada manual desligada.');
     status(result.cells.length === 1 ? 'A e B estão na mesma célula.' : 'Rota calculada no DTM. Grade de '
       + Math.round(grid.pixelSizeM).toLocaleString('pt-BR') + ' m; custo comparativo, sem estimativa de tempo ou energia.'
       + (grid.pixelSizeM > 100 ? ' Rota regional: não resolve inclinações e obstáculos locais.' : ''));
@@ -152,6 +156,7 @@
     if (!endpoints.A || !endpoints.B) { status('Escolha os pontos A e B.'); return; }
     const currentRequest = requestId;
     try {
+      if (editor.isDrawing()) throw new Error('Conclua ou cancele o desenho da área antes de calcular.');
       const weights = readWeights();
       if (automatic() && !/^https?:$/.test(location.protocol)) {
         throw new Error('Para buscar terreno, inicie o serviço e abra http://127.0.0.1:7878/. Gale local continua disponível neste arquivo.');
@@ -193,6 +198,7 @@
 
   function search(activeGrid, weights, signal, currentRequest) {
     return new Promise((resolve, reject) => {
+      const manual = editor.getSnapshot();
       const url = URL.createObjectURL(new Blob([api.createWorkerSource()], { type: 'text/javascript' }));
       let currentWorker;
       try { currentWorker = new Worker(url); } catch (error) { reject(error); return; }
@@ -215,10 +221,18 @@
       const elevations = new Float32Array(activeGrid.elevations);
       currentWorker.postMessage({ requestId: currentRequest,
         grid: { width: activeGrid.width, height: activeGrid.height, stepXM: activeGrid.stepXM,
-          stepYM: activeGrid.stepYM, stepXMByRow: activeGrid.stepXMByRow, elevations },
+          stepYM: activeGrid.stepYM, stepXMByRow: activeGrid.stepXMByRow, elevations,
+          originX: activeGrid.originX, originY: activeGrid.originY, pixelSizeM: activeGrid.pixelSizeM,
+          projection: activeGrid.projection, annotations: manual.areas, traversability: manual.policy },
         start: endpoints.A.cell, goal: endpoints.B.cell, weights }, [elevations.buffer]);
     });
   }
+
+  editor = globalThis.PeixonautasTraversability.createEditor({ map,
+    onChange: () => { clearResult(); status('Transitabilidade alterada. Recalcule a rota para aplicar as áreas e a política.'); },
+    onDrawStart: () => { setSelection(null); clearResult(); status('Desenhando uma área manual. Conclua ou cancele antes de calcular.'); },
+    onDrawEnd: () => status('Desenho cancelado. Escolha os pontos ou calcule novamente.')
+  });
 
   element('selectRouteA').onclick = () => setSelection('A');
   element('selectRouteB').onclick = () => setSelection('B');
@@ -268,11 +282,12 @@
       properties: { terrainId: grid.id, sourceDoi: grid.source.doi, resolutionM: grid.pixelSizeM,
         sourceUrl: grid.source.url, sourceTitle: grid.source.title || grid.name,
         terrainSelection: grid.selection || { mode: 'bundled-local' },
+        manualTraversability: editor.getSnapshot(), traversability: lastResult.traversability,
         coordinateSystem: 'Mars planetocentric latitude / east longitude, degrees',
         elevationReference: grid.source.terrainReference, weights: lastResult.weights,
         distanceM: lastResult.distanceM, ascentM: lastResult.ascentM, descentM: lastResult.descentM,
         maxSlopeDeg: lastResult.maxSlopeDeg, cost: lastResult.cost, costParts: lastResult.costParts,
-        limitations: 'Regional prototype; no local obstacle, soil or weather validation.' },
+        limitations: 'Regional prototype; optional manual terrain interpretation, no sensor-derived soil or weather validation.' },
       geometry: { type: 'LineString', coordinates: lastResult.cells.map(cell => {
         const p = api.cellToLatLon(grid, cell);
         return [p.lon, p.lat, cell.elevationM];

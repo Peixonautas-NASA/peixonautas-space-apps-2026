@@ -79,7 +79,7 @@ function dijkstraReference(grid, start, goal, p) {
   const dist = Array(w * h).fill(Infinity), done = new Set();
   dist[start.y * w + start.x] = 0;
   const valid = (x, y) => x >= 0 && x < w && y >= 0 && y < h
-    && Number.isFinite(z[y * w + x]) && slopes[y * w + x] <= p.maxSlopeDeg;
+    && Number.isFinite(z[y * w + x]) && slopes[y * w + x] <= p.maxSlopeDeg && !grid.blocked?.[y * w + x];
   while (true) {
     let i = -1;
     for (let k = 0; k < dist.length; k++) if (!done.has(k) && Number.isFinite(dist[k]) && (i < 0 || dist[k] < dist[i])) i = k;
@@ -95,7 +95,8 @@ function dijkstraReference(grid, start, goal, p) {
       const distance = Math.hypot((xx - x) * stepX, (yy - y) * grid.stepYM);
       const slope = Math.max(slopes[i], slopes[j], Math.atan(Math.abs(z[j] - z[i]) / distance) * 180 / Math.PI);
       if (slope > p.maxSlopeDeg) continue;
-      const cost = distance * (p.distance + p.slope * (slope / 15) ** 2) + p.ascent * Math.max(0, z[j] - z[i]);
+      const cost = distance * (p.distance + p.slope * (slope / 15) ** 2) + p.ascent * Math.max(0, z[j] - z[i])
+        + distance * (p.terrain ?? 1) * Math.max(grid.terrainCostPerM?.[i] ?? 0, grid.terrainCostPerM?.[j] ?? 0);
       dist[j] = Math.min(dist[j], dist[i] + cost);
     }
   }
@@ -105,6 +106,7 @@ test('A* agrees with Dijkstra on varied terrain and positive cost weights', () =
   for (let seed = 1; seed <= 12; seed++) {
     const grid = flat(7, 7);
     if (seed % 2 === 0) grid.stepXMByRow = Array.from({ length: 7 }, (_, y) => 15 + y * 3);
+    if (seed % 3 === 0) grid.terrainCostPerM = Float32Array.from({ length: 49 }, (_, i) => (i * seed) % 5);
     for (let i = 0; i < 49; i++) grid.elevations[i] = Math.sin(i * seed) * 6;
     const p = { distance: seed / 10, slope: seed / 3, ascent: seed, maxSlopeDeg: 50 };
     const a = { x: 0, y: 0 }, b = { x: 6, y: 6 };
