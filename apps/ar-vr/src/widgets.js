@@ -54,12 +54,12 @@ const dirFrom = (az, el, out = new THREE.Vector3()) =>
 const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 // ---------- Amostragem do terreno ao redor da rota ----------
-function routeBox(path) {
+function routeBox(path, extra = null) {
   let minX = Infinity;
   let maxX = -Infinity;
   let minZ = Infinity;
   let maxZ = -Infinity;
-  for (const p of path) {
+  for (const p of extra ? [...path, extra] : path) {
     minX = Math.min(minX, p.x);
     maxX = Math.max(maxX, p.x);
     minZ = Math.min(minZ, p.z);
@@ -267,13 +267,16 @@ export class Map2DWidget extends SpatialWidget {
   constructor() {
     super('map2d', 'Mapa 2D');
     this.subtitle = 'norte para cima';
-    this.bg = null;
+    this.bg = null; // detalhe em volta da rota (HiRISE em Jezero)
+    this.wide = null; // em volta do astronauta, quando ele sai da área da rota
+    this._wideAt = 0;
     this.viewR = 0;
     this.nav = null;
     this._timer = 1;
   }
 
   rebuild(world, path) {
+    this.world = world;
     const box = routeBox(path);
     // cobre a vista centrada no astronauta em qualquer ponto da rota
     const half = Math.max(600, box.diag * 3.6 + 200); // painel largo: sobra dos lados
@@ -282,8 +285,8 @@ export class Map2DWidget extends SpatialWidget {
     // Mesmas camadas do apps/map-2d: Viking MDIM 2.1 + HiRISE de Jezero (opacidade 0,9), sem filtros
     composeRegionImage(world, box.cx, box.cz, half, { size: 1024, hirise: 'map2d' }).then((img) => {
       if (token !== this._token) return;
-      this.bg = { canvas: img.canvas, minX: box.cx - half, minZ: box.cz - half, size: 2 * half };
-      this.source = `NASA Trek · ${img.sources.join(' + ')}`;
+      const source = `NASA Trek · ${img.sources.join(' + ')}`;
+      this.bg = { canvas: img.canvas, minX: box.cx - half, minZ: box.cz - half, size: 2 * half, source };
       this.redraw();
     });
   }
@@ -292,7 +295,31 @@ export class Map2DWidget extends SpatialWidget {
     this.nav = nav;
     if ((this._timer += dt) < 0.1) return; // ~10 quadros por segundo bastam para o minimapa
     this._timer = 0;
+    this._followAstronaut(nav.pos);
     this.redraw();
+  }
+
+  /** Longe da rota (ex.: subindo uma montanha), baixa os mesmos tiles reais em volta do astronauta. */
+  _followAstronaut(p) {
+    if (!this.world || !this.viewR || this._wideBusy) return;
+    const need = this.viewR * 1.7; // meia-largura da vista (o painel é mais largo que alto)
+    const covers = (b) =>
+      b && p.x - need >= b.minX && p.x + need <= b.minX + b.size && p.z - need >= b.minZ && p.z + need <= b.minZ + b.size;
+    if (covers(this.bg)) return;
+    if (covers(this.wide) && this.wide.size < need * 8) return; // ainda serve (e não está grosseira demais)
+    const now = performance.now();
+    if (now - this._wideAt < 1000) return;
+    this._wideAt = now;
+    this._wideBusy = true;
+    const half = need * 2;
+    const cx = p.x;
+    const cz = p.z;
+    composeRegionImage(this.world, cx, cz, half, { size: 1024, hirise: 'map2d' })
+      .then((img) => {
+        const source = `NASA Trek · ${img.sources.join(' + ')}`;
+        this.wide = { canvas: img.canvas, minX: cx - half, minZ: cz - half, size: 2 * half, source };
+      })
+      .finally(() => (this._wideBusy = false));
   }
 
   drawContent(ctx, r) {
@@ -319,11 +346,18 @@ export class Map2DWidget extends SpatialWidget {
     const cy = r.y + r.h / 2;
     const S = (x, z) => [cx + (x - pos.x) * s, cy + (z - pos.z) * s]; // leste à direita, norte acima
 
-    if (this.bg) {
-      const [x0, y0] = S(this.bg.minX, this.bg.minZ);
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(this.bg.canvas, x0, y0, this.bg.size * s, this.bg.size * s);
-    } else {
+    ctx.imageSmoothingQuality = 'high';
+    for (const layer of [this.wide, this.bg]) {
+      if (!layer) continue; // a camada larga embaixo; o detalhe da rota por cima
+      const [x0, y0] = S(layer.minX, layer.minZ);
+      ctx.drawImage(layer.canvas, x0, y0, layer.size * s, layer.size * s);
+    }
+    const viewHalf = this.viewR * 1.7;
+    const inBg =
+      this.bg && Math.abs(pos.x - (this.bg.minX + this.bg.size / 2)) + viewHalf <= this.bg.size / 2 &&
+      Math.abs(pos.z - (this.bg.minZ + this.bg.size / 2)) + viewHalf <= this.bg.size / 2;
+    this.source = (inBg ? this.bg : this.wide ?? this.bg)?.source;
+    if (!this.bg && !this.wide) {
       ctx.font = '500 18px system-ui, sans-serif';
       ctx.fillStyle = 'rgba(220, 240, 255, 0.7)';
       ctx.textAlign = 'center';
@@ -549,16 +583,36 @@ export class Map3DWidget extends SpatialWidget {
     this.scene3.add(this.astro);
   }
 
-  rebuild(world, path) {
-    // limpa o modelo anterior
+  /**
+   * Monta a maquete em volta da rota (e do astronauta, se `extra` for a posição dele fora da área).
+   * Baixa a textura primeiro e só então troca o modelo, para a maquete antiga não sumir no meio.
+   */
+  async rebuild(world, path, extra = null) {
+    this.world = world;
+    this.path = path;
+    const box = routeBox(path, extra);
+    const half = Math.max(350, box.diag * 1.3);
+    const token = (this._token = (this._token || 0) + 1);
+    this._building = true;
+    this._builtAt = performance.now();
+    if (!this.grid) this.source = 'baixando tiles do NASA Trek…';
+    let img;
+    try {
+      // Textura: mesma receita do apps/map-3d (Viking + HiRISE por luminosidade em Jezero), tiles reais
+      img = await composeRegionImage(world, box.cx, box.cz, half, { size: 1024, hirise: 'map3d' });
+    } finally {
+      if (token === this._token) this._building = false;
+    }
+    if (token !== this._token) return;
+    this.region = { cx: box.cx, cz: box.cz, half, withAstronaut: Boolean(extra) };
+
+    // troca o modelo anterior
     for (const c of [...this.model.children]) {
       this.model.remove(c);
       c.geometry?.dispose();
       c.material?.map?.dispose();
       c.material?.dispose();
     }
-    const box = routeBox(path);
-    const half = Math.max(350, box.diag * 1.3);
     const G = 129;
     // Relevo: MOLA ClrShade decodificado por cromaticidade (o mesmo do map-3d e da caminhada)
     const g = sampleHeights(world, box.cx, box.cz, half, G, 400);
@@ -573,22 +627,12 @@ export class Map3DWidget extends SpatialWidget {
     const pos = geo.attributes.position;
     for (let i = 0; i < pos.count; i++) pos.setY(i, (g.h[i] - g.min) * ky);
     geo.computeVertexNormals();
-    const mat = new THREE.MeshStandardMaterial({ color: 0x8a6a55, roughness: 0.92, metalness: 0.02 });
+    const tex = new THREE.CanvasTexture(img.canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.92, metalness: 0.02 });
     this.model.add(new THREE.Mesh(geo, mat));
-    // Textura: mesma receita do apps/map-3d (Viking + HiRISE por luminosidade em Jezero), tiles reais
-    const token = (this._token = (this._token || 0) + 1);
-    this.source = 'baixando tiles do NASA Trek…';
-    composeRegionImage(world, box.cx, box.cz, half, { size: 1024, hirise: 'map3d' }).then((img) => {
-      if (token !== this._token) return;
-      const tex = new THREE.CanvasTexture(img.canvas);
-      tex.colorSpace = THREE.SRGBColorSpace;
-      tex.anisotropy = 8;
-      mat.map = tex;
-      mat.color.set(0xffffff);
-      mat.needsUpdate = true;
-      this.source = `NASA Trek · MOLA + ${img.sources.join(' + ')}`;
-      this.redraw();
-    });
+    this.source = `NASA Trek · MOLA + ${img.sources.join(' + ')}`;
 
     // laterais da maquete (espessura)
     const skirtPos = [];
@@ -693,9 +737,28 @@ export class Map3DWidget extends SpatialWidget {
     this.orbitPitch = Math.max(0.12, Math.min(1.4, this.orbitPitch + dyPx * 0.006));
   }
 
+  /** Se o astronauta sai da maquete (ou volta para a rota), refaz a área para mostrar os dois. */
+  _followAstronaut(p) {
+    const R = this.region;
+    if (!R || this._building || performance.now() - this._builtAt < 1500) return;
+    const d = Math.max(Math.abs(p.x - R.cx), Math.abs(p.z - R.cz));
+    if (d > R.half * 0.8) {
+      this.rebuild(this.world, this.path, { x: p.x, z: p.z });
+      return;
+    }
+    if (R.withAstronaut) {
+      // voltou para perto da rota: a maquete original (mais detalhada) já o mostra
+      const rb = routeBox(this.path);
+      const rh = Math.max(350, rb.diag * 1.3);
+      if (Math.max(Math.abs(p.x - rb.cx), Math.abs(p.z - rb.cz)) < rh * 0.7) this.rebuild(this.world, this.path);
+    }
+  }
+
   tick(dt, nav, t) {
     this.nav = nav;
-    if (!this.grid || !nav?.path) return;
+    if (!nav?.path) return;
+    this._followAstronaut(nav.pos);
+    if (!this.grid) return;
     if ((this._timer += dt) < 1 / 30) return;
     this._timer = 0;
 

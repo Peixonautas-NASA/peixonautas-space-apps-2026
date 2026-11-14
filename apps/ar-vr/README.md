@@ -1,8 +1,10 @@
 # Visão VR (v0.4): caminhar em Marte pelo celular, com mapas flutuantes
 
 Você fica de pé no terreno marciano em **escala real (1:1)**, na altura dos olhos (1,7 m).
-Girando o celular, a câmera gira junto. O astronauta **segue a rota sozinho**: é uma faixa ciano
-com setas animadas no chão, que leva até um farol âmbar no destino. Ao redor dele flutuam dois
+Girando o celular, a câmera gira junto. **Segurando "Andar"**, você caminha livre para onde
+olha, inclusive subindo montanhas para ver o destino de longe. O botão de **play** faz o astronauta
+seguir a rota sozinho. A rota é uma faixa ciano com setas animadas no chão, que leva até um farol
+âmbar no destino. Ao redor dele flutuam dois
 **widgets espaciais**, como num visor de realidade aumentada: um **Mapa 2D** e um **Mapa 3D**
 (uma maquete holográfica).
 
@@ -90,10 +92,11 @@ O HUD é enxuto, sem emojis, só com texto curto e ícones SVG:
 |---|---|---|
 | canto superior esquerdo | tela cheia · sensores · estéreo · ajustes | Liga ou desliga cada um. No iPhone, o de tela cheia explica como instalar como app. |
 | topo, no centro | linha do destino | Distância até o destino e para que lado ele está. Embaixo, em letra pequena: rumo, elevação e quanto você já andou. |
-| canto inferior esquerdo | pausa · velocidade · alvo | Pausa ou continua a caminhada (ao chegar, vira "recomeçar"). A velocidade alterna entre 1,4, 15 e 300 m/s. O alvo vira o olhar para a rota. |
-| canto inferior direito | **Mapa 2D · Mapa 3D** | Seletor discreto que mostra ou esconde cada widget. Ao reabrir, o widget aparece à sua frente. |
+| canto inferior direito | **Andar** (segure) | Caminha livre para onde você olha. Isso pausa o piloto automático. |
+| canto inferior esquerdo | play/pausa · velocidade · alvo | O play faz o astronauta seguir a rota sozinho (ao chegar, vira "recomeçar"). A velocidade alterna entre 1,4, 15 e 300 m/s e vale para os dois modos. O alvo vira o olhar para a rota. |
+| canto superior direito | **Mapa 2D · Mapa 3D** | Seletor discreto que mostra ou esconde cada widget. Ao reabrir, o widget aparece à sua frente. |
 
-No modo estéreo, a interface some. Um toque na tela (ou o botão do Cardboard) pausa ou continua.
+No modo estéreo, a interface some. Segurar a tela (ou o botão do Cardboard) faz andar.
 
 ### Widgets espaciais (Mapa 2D e Mapa 3D)
 
@@ -105,7 +108,11 @@ São painéis de vidro que **existem no mundo**, não na tela:
 - **Arrastar a barra de título** (no Mapa 2D, qualquer parte) leva o painel para outro ponto ao
   seu redor, sempre à mesma distância. A posição fica salva no navegador.
 - **No Mapa 3D, arrastar a maquete** faz ela girar, para ver o trajeto de qualquer ângulo.
-- **O X fecha.** O seletor no canto inferior direito reabre.
+- **O X fecha.** O seletor no canto superior direito reabre.
+- **Longe da rota**, por exemplo subindo uma montanha, os dois mapas acompanham você:
+  - o Mapa 2D baixa os mesmos tiles reais em volta da sua posição;
+  - o Mapa 3D refaz a maquete para mostrar você e a rota juntos;
+  - quando você volta, a maquete detalhada da rota volta também.
 - **Dados reais da NASA nos dois mapas.** As camadas são as mesmas do `apps/map-2d` e do
   `apps/map-3d`: mosaico **Viking MDIM 2.1** e, em Jezero, o mosaico **HiRISE/CTX/HRSC**. O relevo
   é o **MOLA** decodificado por cromaticidade. Cada camada vem do NASA Trek no zoom nativo
@@ -182,8 +189,8 @@ src/
   - ao mover, o azimute e a elevação passam a seguir o raio do dedo, e a distância não muda.
 - **Mapa 3D:** é uma cena separada, renderizada numa textura com fundo transparente, que fica
   num plano à frente do vidro.
-- **Piloto automático:** o astronauta persegue um ponto um pouco à frente na rota. Se você sair
-  dela andando pelo teclado, ele volta ao soltar as teclas.
+- **Piloto automático:** o astronauta persegue um ponto um pouco à frente na rota. Andar livre
+  (botão Andar ou teclado) pausa o piloto. O play retoma, e ele volta para a rota.
 - **Rota:** em Jezero, a rota de exemplo é definida em lat/lon. Nos outros locais, o ponto de
   partida é o lugar mais plano num raio de 15 km do preset, e a rota de ~800 m segue o rumo
   mais plano a partir dali.
@@ -206,7 +213,7 @@ src/
   rota de ~800 m, isso dá poucos pixels, e o mapa fica quase uniforme. É o dado real disponível.
   Em Jezero, o HiRISE mostra o chão em detalhe. O relevo tem um vértice a cada ~650 m, então
   rotas curtas e planas geram uma maquete quase plana.
-- **Andar fisicamente:** hoje o astronauta anda sozinho pela rota. Para andar com passos reais, a próxima
+- **Andar fisicamente:** hoje você anda pelo botão ou pelo piloto automático. Para andar com passos reais, a próxima
   etapa seria WebXR AR, que funciona no Chrome do Android.
 
 ## Proposta: código para `packages/shared` (ainda não movido)

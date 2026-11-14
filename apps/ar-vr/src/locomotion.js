@@ -1,8 +1,8 @@
 // Caminhada em primeira pessoa sobre o terreno.
-//  - Piloto automático: o astronauta segue a rota sozinho (dá para pausar). Olhar em volta não muda o
-//    caminho: a direção do passo vem da rota, não da cabeça.
-//  - Teclado (PC): W/S ou setas = frente/trás, A/D = lados, Shift = 5x mais rápido. Enquanto houver
-//    tecla apertada, o piloto automático espera; ao soltar, ele volta para a rota.
+//  - Caminhada livre: segurar o botão "Andar" (ou a tela, no estéreo) anda para onde você olha.
+//    Teclado (PC): W/S ou setas = frente/trás, A/D = lados, Shift = 5x mais rápido.
+//    Andar livre PAUSA o piloto automático (senão ele puxaria você de volta para a rota).
+//  - Piloto automático: segue a rota sozinho; o botão de play retoma (voltando para a rota).
 // A câmera fica sempre a EYE_HEIGHT do chão, com suavização vertical para não "pular" degraus.
 import * as THREE from 'three';
 
@@ -20,6 +20,7 @@ export class Walker {
     this.world = world;
     this.speedIndex = 0;
     this.keys = new Set();
+    this.holding = false;
     this.walked = 0; // metros percorridos
     this.auto = true; // piloto automático ligado
     this.path = null; // pontos da rota com distância acumulada .d
@@ -30,7 +31,10 @@ export class Walker {
     const typing = (e) => e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement;
     window.addEventListener('keydown', (e) => !typing(e) && this.keys.add(e.key.toLowerCase()));
     window.addEventListener('keyup', (e) => this.keys.delete(e.key.toLowerCase()));
-    window.addEventListener('blur', () => this.keys.clear());
+    window.addEventListener('blur', () => {
+      this.keys.clear();
+      this.holding = false;
+    });
   }
 
   get speed() {
@@ -49,6 +53,24 @@ export class Walker {
     this.progress = 0;
     this.finished = false;
   }
+  /** Liga um elemento como "segure para andar". */
+  bindHold(el) {
+    const down = (e) => {
+      e.stopPropagation();
+      if (e.pointerId !== undefined) el.setPointerCapture?.(e.pointerId);
+      this.holding = true;
+      el.classList.add('active');
+    };
+    const up = () => {
+      this.holding = false;
+      el.classList.remove('active');
+    };
+    el.addEventListener('pointerdown', down);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+    el.addEventListener('lostpointercapture', up);
+  }
+
   /** Volta para o início da rota e retoma a caminhada. */
   restart() {
     if (!this.path) return;
@@ -110,7 +132,7 @@ export class Walker {
 
   update(dt) {
     const k = this.keys;
-    const fwd = (k.has('w') || k.has('arrowup') ? 1 : 0) - (k.has('s') || k.has('arrowdown') ? 1 : 0);
+    const fwd = (this.holding || k.has('w') || k.has('arrowup') ? 1 : 0) - (k.has('s') || k.has('arrowdown') ? 1 : 0);
     const side = (k.has('d') || k.has('arrowright') ? 1 : 0) - (k.has('a') || k.has('arrowleft') ? 1 : 0);
     const p = this.camera.position;
     const ox = p.x;
@@ -119,6 +141,7 @@ export class Walker {
     const manual = fwd !== 0 || side !== 0;
 
     if (manual) {
+      this.auto = false; // caminhada livre: o piloto automático fica pausado até apertar play
       // rumo pela rotação em Y (funciona mesmo olhando para os pés)
       const yaw = this._e.setFromQuaternion(this.camera.quaternion, 'YXZ').y;
       const fx = -Math.sin(yaw);

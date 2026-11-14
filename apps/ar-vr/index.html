@@ -53,8 +53,17 @@
     #leftPad { position: fixed; left: var(--sl); bottom: var(--sb); display: flex; gap: 6px; z-index: 5; align-items: center; }
     #speedBtn { height: 34px; border-radius: 10px; padding: 0 10px; font-size: 12px; opacity: 0.85; }
 
-    /* Canto inferior direito: seletor discreto dos widgets */
-    #widgetBar { position: fixed; right: var(--sr); bottom: var(--sb); display: flex; z-index: 5; border-radius: 10px;
+    /* Polegar direito: segurar para andar para onde você olha */
+    #walkBtn { position: fixed; right: calc(var(--sr) + 4px); bottom: calc(var(--sb) + 4px); width: 74px; height: 74px;
+      border-radius: 50%; padding: 0; z-index: 5; touch-action: none; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 2px; font-size: 11px; letter-spacing: 0.02em;
+      border: 1.5px solid rgba(62, 230, 255, 0.65); background: rgba(14, 50, 64, 0.5); color: #dff8ff; }
+    #walkBtn svg { width: 22px; height: 22px; }
+    #walkBtn.active { background: rgba(62, 230, 255, 0.85); color: #04212a; transform: scale(1.06);
+      box-shadow: 0 0 18px rgba(62, 230, 255, 0.6); }
+
+    /* Canto superior direito: seletor discreto dos widgets */
+    #widgetBar { position: fixed; right: var(--sr); top: var(--st); display: flex; z-index: 5; border-radius: 10px;
       border: 1px solid var(--line); background: var(--glass); overflow: hidden;
       backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
     #widgetBar button { border: 0; background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none;
@@ -119,7 +128,7 @@
     #exitStereo { display: none; position: fixed; top: 6px; left: 50%; transform: translateX(-50%); z-index: 10;
       padding: 4px 10px; font-size: 11px; border-radius: 999px; opacity: 0.55; }
     body.stereo #exitStereo { display: block; }
-    body.stereo #tools, body.stereo #hud, body.stereo #leftPad, body.stereo #widgetBar,
+    body.stereo #tools, body.stereo #hud, body.stereo #leftPad, body.stereo #widgetBar, body.stereo #walkBtn,
     body.stereo #settings, body.stereo #crosshair { display: none !important; }
   </style>
 </head>
@@ -154,6 +163,10 @@
     </button>
   </div>
 
+  <button id="walkBtn" aria-label="Andar (segure)">
+    <svg viewBox="0 0 24 24" class="stroke"><path d="M12 19V5M6 11l6-6 6 6" /></svg>Andar
+  </button>
+
   <div id="widgetBar" role="group" aria-label="Widgets">
     <button id="map2dBtn" title="Mostrar ou esconder o Mapa 2D"><span class="dot"></span>Mapa 2D</button>
     <button id="map3dBtn" title="Mostrar ou esconder o Mapa 3D"><span class="dot"></span>Mapa 3D</button>
@@ -172,10 +185,12 @@
       <input type="range" id="smoothSlider" min="1" max="30" step="1" value="10" />
     </label>
     <label class="check"><input type="checkbox" id="detailToggle" checked /> Textura de detalhe perto dos pés</label>
-    <p>O astronauta segue a rota sozinho. O botão de pausa para e retoma; ao chegar, ele vira "recomeçar". O alvo
-      vira o olhar para a rota.</p>
+    <p>Segure Andar para caminhar livre para onde você olha (inclusive subir montanhas). Isso pausa o piloto
+      automático; o play o retoma e ele volta a seguir a rota. Ao chegar, o play vira "recomeçar". O alvo vira o
+      olhar para a rota.</p>
     <p>Mapas: arraste pela barra de título para mudar de lugar (eles ficam sempre à mesma distância de você). No Mapa 3D,
-      arraste a maquete para girar. O X fecha; o seletor no canto inferior direito reabre à sua frente.</p>
+      arraste a maquete para girar. O X fecha; o seletor no canto superior direito reabre à sua frente. Os mapas
+      acompanham você mesmo longe da rota.</p>
     <p>Sensores: menor = mais suave (menos tremor, mais atraso). Com sensores ligados, arrastar a tela ajusta só o rumo.</p>
     <p>PC: espaço pausa; W/A/S/D ou setas andam livre; Shift = 5x mais rápido.</p>
     <p id="hudSource">—</p>

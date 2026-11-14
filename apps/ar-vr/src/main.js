@@ -33,6 +33,7 @@ const ui = {
   smoothVal: $('smoothVal'),
   detailToggle: $('detailToggle'),
   playBtn: $('playBtn'),
+  walkBtn: $('walkBtn'),
   map2dBtn: $('map2dBtn'),
   map3dBtn: $('map3dBtn'),
   speedBtn: $('speedBtn'),
@@ -271,7 +272,7 @@ function showStart() {
     else ui.startNote.textContent = 'Liga os sensores de movimento.';
   }
   if (!isTouch) {
-    ui.startNote.textContent = 'No computador: arraste para olhar. O astronauta segue a rota sozinho (espaço pausa; W/A/S/D anda livre).';
+    ui.startNote.textContent = 'No computador: arraste para olhar, W/A/S/D para andar livre e espaço para seguir a rota sozinho.';
     ui.startPlain.hidden = true;
   }
   ui.start.hidden = false;
@@ -284,7 +285,7 @@ function begin({ fullscreen }) {
   if (isTouch || isIOS) turnSensorsOn();
   if (fullscreen && canFullscreen && isTouch) enterFullscreen().catch(() => {});
   updateRotateOverlay();
-  setTimeout(() => toast('O astronauta segue a rota sozinho. Arraste os mapas pela barra de título.', 4500), 600);
+  setTimeout(() => toast('Segure Andar para caminhar para onde você olha. O play segue a rota sozinho.', 4500), 600);
 }
 ui.startBtn.addEventListener('click', () => begin({ fullscreen: true }));
 ui.startPlain.addEventListener('click', () => begin({ fullscreen: false }));
@@ -353,15 +354,24 @@ renderSpeed();
 ui.map2dBtn.addEventListener('click', () => widgets.toggle('map2d'));
 ui.map3dBtn.addEventListener('click', () => widgets.toggle('map3d'));
 
-// Modo estéreo: tocar a tela (ou o botão do Cardboard) pausa ou continua a caminhada
-renderer.domElement.addEventListener('click', () => {
-  if (stereoOn) togglePlay();
+// Caminhada livre: segurar Andar anda para onde você olha (e pausa o piloto automático)
+walker.bindHold(ui.walkBtn);
+
+// Modo estéreo: segurar em qualquer lugar da tela (ou o botão do Cardboard) = andar
+renderer.domElement.addEventListener('pointerdown', () => {
+  if (stereoOn) walker.holding = true;
 });
+['pointerup', 'pointercancel'].forEach((ev) =>
+  renderer.domElement.addEventListener(ev, () => {
+    if (stereoOn) walker.holding = false;
+  })
+);
 
 async function setStereo(on) {
   stereoOn = on;
   look.dragEnabled = !on;
-  widgets.enabled = !on; // no estéreo, o toque serve para pausar
+  widgets.enabled = !on; // no estéreo, o toque serve para andar
+  walker.holding = false;
   document.body.classList.toggle('stereo', on);
   if (on) {
     try {
@@ -369,7 +379,7 @@ async function setStereo(on) {
     } catch {
       /* segue sem tela cheia */
     }
-    toast('Estéreo: toque na tela (ou no botão do Cardboard) para pausar ou continuar.');
+    toast('Estéreo: segure a tela (ou o botão do Cardboard) para andar.');
     if (!look.sensorsActive) setTimeout(() => toast('Dica: ative os sensores antes do modo estéreo.'), 3600);
   }
   onResize();
@@ -454,7 +464,7 @@ function updateHud(ground, camYaw, hFov) {
   else if (Math.abs(rel) < (hFov / 2) * 0.8) hint = 'à frente';
   else if (rel > 0) hint = '← à esquerda';
   else hint = 'à direita →';
-  const paused = walker.finished || walker.auto ? '' : ' · pausado';
+  const paused = walker.finished || walker.auto ? '' : ' · rota pausada';
   ui.hudDest.textContent = `Destino ${fmtDist(dist)} · ${hint}${paused}`;
 }
 
@@ -489,6 +499,7 @@ renderer.setAnimationLoop(() => {
     updateHud(ground, camYaw, hFov);
     renderPlay();
   }
+  ui.walkBtn.classList.toggle('active', walker.holding);
   if (stereoOn) stereo.render(scene, camera);
   else renderer.render(scene, camera);
 });
