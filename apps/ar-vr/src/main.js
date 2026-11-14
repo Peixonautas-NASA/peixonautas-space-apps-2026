@@ -1,17 +1,22 @@
 import * as THREE from 'three';
 import { StereoEffect } from 'three/addons/effects/StereoEffect.js';
-import { loadTerrain, loadDetailPatch } from './terrain.js';
+import { TerrainWorld } from './terrain.js';
 import { LookControls, yawOfDirection } from './orientation.js';
-import { buildRoute, START } from './route.js';
+import { Walker } from './locomotion.js';
+import { buildRoute } from './route.js';
+import { PLACES, DEFAULT_PLACE, exampleRouteFrom } from './places.js';
 
-const EYE_HEIGHT = 1.7; // m
-const BASE_METERS_PER_UNIT = 1500; // pseudo-elevação 0..1 -> metros (ver README: relevo aproximado)
 const SKY_TOP = new THREE.Color(0x4a3328);
 const SKY_HORIZON = new THREE.Color(0xc99a72);
+
+const params = new URLSearchParams(location.search);
+const placeKey = PLACES[params.get('local')] ? params.get('local') : DEFAULT_PLACE;
+const place = PLACES[placeKey];
 
 const $ = (id) => document.getElementById(id);
 const ui = {
   loading: $('loading'),
+  loadingPlace: $('loadingPlace'),
   loadingText: $('loadingText'),
   sensorsBtn: $('sensorsBtn'),
   recenterBtn: $('recenterBtn'),
@@ -19,15 +24,29 @@ const ui = {
   stereoBtn: $('stereoBtn'),
   settingsBtn: $('settingsBtn'),
   settings: $('settings'),
-  reliefSlider: $('reliefSlider'),
-  reliefVal: $('reliefVal'),
+  placeSelect: $('placeSelect'),
+  exagSlider: $('exagSlider'),
+  exagVal: $('exagVal'),
+  exagReset: $('exagReset'),
   smoothSlider: $('smoothSlider'),
   smoothVal: $('smoothVal'),
+  detailToggle: $('detailToggle'),
+  walkBtn: $('walkBtn'),
+  speedBtn: $('speedBtn'),
   exitStereo: $('exitStereo'),
-  hudHeading: $('hudHeading'),
   hudDest: $('hudDest'),
+  hudInfo: $('hudInfo'),
   hudSource: $('hudSource'),
   toast: $('toast'),
+  start: $('start'),
+  startPlace: $('startPlace'),
+  startBtn: $('startBtn'),
+  startPlain: $('startPlain'),
+  startNote: $('startNote'),
+  rotateOverlay: $('rotateOverlay'),
+  rotateDismiss: $('rotateDismiss'),
+  installSheet: $('installSheet'),
+  installClose: $('installClose'),
 };
 
 function toast(msg, ms = 3500) {
@@ -37,8 +56,9 @@ function toast(msg, ms = 3500) {
   toast.t = setTimeout(() => ui.toast.classList.remove('show'), ms);
 }
 
-// ---------- Renderer / cena (mesmos ajustes de cor do map-3d) ----------
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+// ---------- Renderer / cena ----------
+// logarithmicDepthBuffer: precisão de profundidade de 10 cm (rota no chão) até 100+ km (paredões).
+const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -51,12 +71,11 @@ stereo.setSize(window.innerWidth, window.innerHeight);
 let stereoOn = false;
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(SKY_HORIZON, 150, 2300);
+// Névoa leve: em escala real dá para ver paredões a dezenas de km; esconde a borda do bloco (83+ km).
+scene.fog = new THREE.Fog(SKY_HORIZON, 4000, 80000);
 
-const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 8000);
-camera.position.set(0, EYE_HEIGHT, 0);
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 200000);
 
-// Céu marciano em degradê (cor do horizonte = cor da névoa, para esconder a borda do terreno)
 const sky = new THREE.Mesh(
   new THREE.SphereGeometry(5000, 32, 16),
   new THREE.ShaderMaterial({
@@ -65,16 +84,21 @@ const sky = new THREE.Mesh(
     fog: false,
     uniforms: { top: { value: SKY_TOP }, horizon: { value: SKY_HORIZON } },
     vertexShader: /* glsl */ `
+      #include <common>
+      #include <logdepthbuf_pars_vertex>
       varying vec3 vDir;
       void main() {
         vDir = normalize(position);
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        #include <logdepthbuf_vertex>
       }`,
     fragmentShader: /* glsl */ `
+      #include <logdepthbuf_pars_fragment>
       uniform vec3 top;
       uniform vec3 horizon;
       varying vec3 vDir;
       void main() {
+        #include <logdepthbuf_fragment>
         float h = clamp(vDir.y, 0.0, 1.0);
         gl_FragColor = vec4(mix(horizon, top, pow(h, 0.55)), 1.0);
         #include <tonemapping_fragment>
@@ -85,64 +109,62 @@ const sky = new THREE.Mesh(
 sky.renderOrder = -1;
 scene.add(sky);
 
-// Iluminação (sol com azimute 45° / elevação 30°, padrão do map-3d)
-scene.add(new THREE.HemisphereLight(0xffe2c4, 0x3a2418, 0.55));
+// Iluminação (sol: azimute 45°, elevação 28°, padrão do map-3d)
+// Luz do céu forte: a poeira marciana espalha bastante luz e as encostas em sombra não ficam pretas
+scene.add(new THREE.HemisphereLight(0xffe2c4, 0x6a4a36, 0.95));
 const sun = new THREE.DirectionalLight(0xfff1e0, 2.4);
-{
-  const az = (45 * Math.PI) / 180;
-  const el = (30 * Math.PI) / 180;
-  sun.position.set(Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)).multiplyScalar(1000);
-}
-scene.add(sun);
+const SUN_EL = (28 * Math.PI) / 180;
+const SUN_AZ = (45 * Math.PI) / 180;
+const SUN_DIR = new THREE.Vector3(
+  Math.cos(SUN_EL) * Math.cos(SUN_AZ),
+  Math.sin(SUN_EL),
+  Math.cos(SUN_EL) * Math.sin(SUN_AZ)
+);
+scene.add(sun, sun.target);
 
-// ---------- Controles ----------
+// ---------- Mundo, controles, rota ----------
+const world = new TerrainWorld(scene, { lat: place.lat, lon: place.lon });
 const look = new LookControls(camera, renderer.domElement);
-
-// ---------- Terreno + rota ----------
-let terrain = null;
+const walker = new Walker(camera, world);
 let route = null;
-let patch = null;
-let destYaw = 0;
-let aimYaw = 0;
+let arrived = false;
+
+function aimYaw() {
+  // aponta para o próximo trecho da rota a partir de onde a pessoa está
+  if (!route) return 0;
+  const p = camera.position;
+  const ahead = route.points.find((q) => Math.hypot(q.x - p.x, q.z - p.z) > 25) ?? route.dest;
+  return yawOfDirection(ahead.x - p.x, ahead.z - p.z);
+}
 
 async function init() {
-  terrain = await loadTerrain({
-    lat0: START.lat,
-    lon0: START.lon,
-    zoom: 13,
-    grid: 5,
-    metersPerUnit: BASE_METERS_PER_UNIT,
-    onProgress: (d, t) => (ui.loadingText.textContent = `Baixando tiles NASA Trek… ${d}/${t}`),
-  });
-  scene.add(terrain.mesh);
-  camera.position.y = terrain.heightAt(0, 0) + EYE_HEIGHT;
-
-  route = buildRoute(terrain);
+  ui.loadingPlace.textContent = place.name;
+  await world.init((d, t) => (ui.loadingText.textContent = `Baixando tiles NASA Trek… ${d}/${t}`));
+  // Rota: a do local (lat/lon) ou uma de exemplo saindo do ponto mais plano por perto
+  let points;
+  let destName;
+  if (place.route) {
+    camera.position.set(0, 0, 0);
+    points = place.route.points.map((p) => world.toWorld(p.lat, p.lon));
+    destName = place.route.destName;
+  } else {
+    const spot = world.findFlatSpot(0, 0); // evita nascer numa encosta (ex.: parede do cânion)
+    camera.position.set(spot.x, 0, spot.z);
+    points = exampleRouteFrom(spot.x, spot.z, world.yawFlattest(spot.x, spot.z));
+    destName = 'Destino de exemplo';
+  }
+  walker.snapToGround();
+  route = buildRoute(world, points, destName);
+  route.points = points;
   scene.add(route.group);
+  world.onChunkChange = () => route.relayout();
 
-  destYaw = yawOfDirection(route.dest.x, route.dest.z);
-  // olhar inicial (e "Recentralizar"): ao longo do primeiro trecho da rota, para a faixa aparecer
-  aimYaw = yawOfDirection(route.aim.x, route.aim.z);
-  look.recenter(aimYaw);
-  look.dragPitch = -0.12; // levemente para baixo, mostrando o caminho
-  camera.quaternion.setFromEuler(new THREE.Euler(look.dragPitch, aimYaw, 0, 'YXZ'));
+  look.recenter(aimYaw());
+  look.dragPitch = -0.12;
+  camera.quaternion.setFromEuler(new THREE.Euler(look.dragPitch, look.dragYaw, 0, 'YXZ'));
 
-  ui.hudSource.textContent =
-    terrain.hiriseCount > 0
-      ? `Jezero · HiRISE+Viking+MOLA (z${terrain.zoom})`
-      : `Viking+MOLA interpolado (z${terrain.zoom})`;
   ui.loading.classList.add('hidden');
-
-  // Detalhe HiRISE perto do usuário (carrega depois, sem travar a entrada na cena)
-  loadDetailPatch(terrain, { lat0: START.lat, lon0: START.lon, zoom: 16, grid: 5 })
-    .then((p) => {
-      if (!p) return;
-      patch = p;
-      scene.add(p.mesh);
-      ui.hudSource.textContent = `Jezero · HiRISE z${p.zoom} perto · z${terrain.zoom} ao longe`;
-    })
-    .catch((e) => console.warn('Detalhe HiRISE indisponível', e));
-  if (!window.isSecureContext) toast('Página sem HTTPS: sensores indisponíveis. Arraste para olhar.', 6000);
+  showStart();
 }
 
 init().catch((err) => {
@@ -150,43 +172,43 @@ init().catch((err) => {
   ui.loadingText.textContent = `Erro ao carregar terreno: ${err.message}`;
 });
 
-// ---------- Botões ----------
-ui.sensorsBtn.addEventListener('click', async () => {
-  if (look.sensorsActive) {
-    look.disableSensors();
-    ui.sensorsBtn.textContent = 'Ativar sensores';
-    ui.sensorsBtn.classList.remove('on');
-    return;
-  }
-  try {
-    look.pendingRecenter = null; // mantém a direção para onde a pessoa já está olhando
-    await look.enableSensors();
-    ui.sensorsBtn.textContent = 'Sensores ✓';
-    ui.sensorsBtn.classList.add('on');
-    navigator.wakeLock?.request('screen').catch(() => {});
-  } catch (err) {
-    toast(err.message, 5000);
-  }
-});
-
-ui.recenterBtn.addEventListener('click', () => look.recenter(aimYaw));
+// ---------- Plataforma: tela cheia, app instalado, orientação ----------
+const isIOS = /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isInstalledApp =
+  window.matchMedia('(display-mode: fullscreen)').matches ||
+  window.matchMedia('(display-mode: standalone)').matches ||
+  navigator.standalone === true;
+const isTouch = window.matchMedia('(pointer: coarse)').matches;
+const canFullscreen = Boolean(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+const isPortrait = () => window.innerHeight > window.innerWidth;
 
 function isFullscreen() {
   return Boolean(document.fullscreenElement || document.webkitFullscreenElement);
 }
+/** Entra em tela cheia e trava na horizontal (Android). Chamar dentro de um toque do usuário. */
 async function enterFullscreen() {
   const el = document.documentElement;
   const req = el.requestFullscreen || el.webkitRequestFullscreen;
   if (!req) {
-    toast('Tela cheia não suportada aqui. No iPhone: Compartilhar → "Adicionar à Tela de Início".', 6000);
+    if (isIOS && !isInstalledApp) ui.installSheet.hidden = false;
     return false;
   }
-  await req.call(el);
+  await req.call(el, { navigationUI: 'hide' });
+  try {
+    await screen.orientation?.lock?.('landscape');
+  } catch {
+    /* alguns navegadores não deixam travar; o aviso de "deite o celular" cobre isso */
+  }
   return true;
 }
 async function exitFullscreen() {
   const exit = document.exitFullscreen || document.webkitExitFullscreen;
   if (exit && isFullscreen()) await exit.call(document);
+}
+function syncFullscreenUi() {
+  // Já instalado como app (tela cheia nativa): o botão não é necessário
+  ui.fullscreenBtn.hidden = isInstalledApp && !canFullscreen;
+  ui.fullscreenBtn.classList.toggle('on', isFullscreen() || isInstalledApp);
 }
 ui.fullscreenBtn.addEventListener('click', async () => {
   try {
@@ -196,76 +218,196 @@ ui.fullscreenBtn.addEventListener('click', async () => {
     toast(`Tela cheia falhou: ${err.message}`);
   }
 });
+ui.installClose.addEventListener('click', () => (ui.installSheet.hidden = true));
+
+// ---------- Sensores ----------
+async function turnSensorsOn() {
+  try {
+    look.pendingRecenter = null; // mantém a direção para onde a pessoa já está olhando
+    await look.enableSensors();
+    ui.sensorsBtn.classList.add('on');
+    navigator.wakeLock?.request('screen').catch(() => {});
+    return true;
+  } catch (err) {
+    toast(err.message, 5000);
+    return false;
+  }
+}
+ui.sensorsBtn.addEventListener('click', () => {
+  if (look.sensorsActive) {
+    look.disableSensors();
+    ui.sensorsBtn.classList.remove('on');
+    toast('Sensores desligados: arraste a tela para olhar.', 2500);
+  } else turnSensorsOn();
+});
+
+// ---------- Tela de entrada: um toque = tela cheia + horizontal + sensores ----------
+let started = false;
+function showStart() {
+  ui.startPlace.textContent = place.name;
+  if (!canFullscreen) {
+    ui.startPlain.hidden = true;
+    if (isInstalledApp) ui.startNote.textContent = 'Liga os sensores de movimento. Segure o celular na horizontal.';
+    else if (isIOS) ui.startNote.textContent = 'No iPhone, a tela cheia vem ao instalar como app (o botão ⛶ explica como).';
+    else ui.startNote.textContent = 'Liga os sensores de movimento.';
+  }
+  if (!isTouch) {
+    ui.startNote.textContent = 'No computador: arraste para olhar e use W/A/S/D para andar.';
+    ui.startPlain.hidden = true;
+  }
+  ui.start.hidden = false;
+}
+function begin({ fullscreen }) {
+  if (started) return;
+  started = true;
+  ui.start.hidden = true;
+  // Tudo disparado no mesmo toque (o iOS exige o gesto para pedir permissão dos sensores)
+  if (isTouch || isIOS) turnSensorsOn();
+  if (fullscreen && canFullscreen && isTouch) enterFullscreen().catch(() => {});
+  updateRotateOverlay();
+  setTimeout(() => toast('Segure ⬆ Andar para caminhar na direção em que você olha.', 4500), 600);
+}
+ui.startBtn.addEventListener('click', () => begin({ fullscreen: true }));
+ui.startPlain.addEventListener('click', () => begin({ fullscreen: false }));
+
+// Celular em pé: pede para deitar (dá para dispensar)
+let portraitOk = false;
+function updateRotateOverlay() {
+  ui.rotateOverlay.hidden = !(started && isTouch && isPortrait() && !portraitOk && !stereoOn);
+}
+ui.rotateDismiss.addEventListener('click', () => {
+  portraitOk = true;
+  updateRotateOverlay();
+});
+
+ui.recenterBtn.addEventListener('click', () => look.recenter(aimYaw()));
+
+walker.bindHold(ui.walkBtn);
+function renderSpeed() {
+  const s = walker.speed;
+  ui.speedBtn.textContent = `${s.icon} ${s.v.toLocaleString('pt-BR')} m/s`;
+  ui.speedBtn.title = s.label;
+}
+ui.speedBtn.addEventListener('click', () => {
+  walker.cycleSpeed();
+  renderSpeed();
+  toast(`Velocidade: ${walker.speed.label} (${walker.speed.v.toLocaleString('pt-BR')} m/s)`, 1800);
+});
+renderSpeed();
+
+// Modo estéreo: segurar em qualquer lugar da tela = andar (o botão do Cardboard também conta)
+renderer.domElement.addEventListener('pointerdown', () => {
+  if (stereoOn) walker.holding = true;
+});
+['pointerup', 'pointercancel'].forEach((ev) =>
+  renderer.domElement.addEventListener(ev, () => {
+    if (stereoOn) walker.holding = false;
+  })
+);
 
 async function setStereo(on) {
   stereoOn = on;
+  look.dragEnabled = !on;
+  walker.holding = false;
   document.body.classList.toggle('stereo', on);
   if (on) {
     try {
       if (!isFullscreen()) await enterFullscreen();
-      await screen.orientation?.lock?.('landscape');
     } catch {
-      /* iOS não deixa travar a orientação: basta virar o celular */
+      /* segue sem tela cheia */
     }
-    if (window.innerHeight > window.innerWidth) toast('Vire o celular na horizontal e encaixe no Cardboard.');
-    if (!look.sensorsActive) toast('Dica: ative os sensores antes do modo estéreo.');
-  } else {
-    screen.orientation?.unlock?.();
+    toast('Estéreo: segure a tela (ou o botão do Cardboard) para andar.');
+    if (!look.sensorsActive) setTimeout(() => toast('Dica: ative os sensores (🧭) antes do modo estéreo.'), 3600);
   }
   onResize();
 }
 ui.stereoBtn.addEventListener('click', () => setStereo(true));
+ui.exitStereo.addEventListener('pointerdown', (e) => e.stopPropagation());
 ui.exitStereo.addEventListener('click', () => setStereo(false));
-// Atalho para testar no PC: ?estereo=1
-if (new URLSearchParams(location.search).has('estereo')) setStereo(true);
+if (params.has('estereo')) {
+  started = true;
+  setStereo(true); // atalho para testar no PC
+}
 
+// ---------- Ajustes ----------
 ui.settingsBtn.addEventListener('click', () => ui.settings.classList.toggle('open'));
-ui.reliefSlider.addEventListener('input', () => {
-  const k = parseFloat(ui.reliefSlider.value);
-  ui.reliefVal.textContent = `${k.toFixed(1)}x`;
-  if (!terrain) return;
-  terrain.setVerticalScale(BASE_METERS_PER_UNIT * k);
-  route.relayout();
-  patch?.relayout();
-  camera.position.y = terrain.heightAt(0, 0) + EYE_HEIGHT;
+for (const [key, p] of Object.entries(PLACES)) {
+  const opt = document.createElement('option');
+  opt.value = key;
+  opt.textContent = p.name;
+  opt.selected = key === placeKey;
+  ui.placeSelect.appendChild(opt);
+}
+ui.placeSelect.addEventListener('change', () => {
+  const q = new URLSearchParams(location.search);
+  q.set('local', ui.placeSelect.value);
+  location.search = q.toString();
 });
+
+function applyExag(k) {
+  ui.exagSlider.value = k;
+  ui.exagVal.textContent = k === 1 ? '1.0x (real 1:1)' : `${k.toFixed(1)}x`;
+  world.setExag(k);
+  route?.relayout();
+  walker.snapToGround();
+}
+ui.exagSlider.addEventListener('input', () => applyExag(parseFloat(ui.exagSlider.value)));
+ui.exagReset.addEventListener('click', () => applyExag(1));
 ui.smoothSlider.addEventListener('input', () => {
-  // 1 (bem suave) .. 30 (quase sem filtro)
-  look.smoothing = parseFloat(ui.smoothSlider.value);
+  look.smoothing = parseFloat(ui.smoothSlider.value); // 1 (bem suave) .. 30 (quase sem filtro)
   ui.smoothVal.textContent = look.smoothing.toFixed(0);
 });
+ui.detailToggle.addEventListener('change', () => world.setDetail(ui.detailToggle.checked));
 
 // ---------- Resize ----------
 function onResize() {
   const w = window.innerWidth;
   const h = window.innerHeight;
   camera.aspect = w / h; // o StereoEffect já usa metade da largura por olho
+  // Deitado (modo principal) o campo de visão horizontal fica largo: reduz o vertical para não distorcer
+  camera.fov = w > h ? 55 : 70;
   camera.updateProjectionMatrix();
+  updateRotateOverlay();
+  syncFullscreenUi();
   renderer.setSize(w, h);
   stereo.setSize(w, h);
 }
 window.addEventListener('resize', onResize);
 screen.orientation?.addEventListener?.('change', onResize);
 document.addEventListener('fullscreenchange', onResize);
+document.addEventListener('webkitfullscreenchange', onResize);
+onResize();
 
 // ---------- HUD ----------
 const fwd = new THREE.Vector3();
-function updateHud() {
+const fmtDist = (m) => (Math.abs(m) >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${Math.round(m)} m`);
+function updateHud(ground) {
   camera.getWorldDirection(fwd);
   const camYaw = yawOfDirection(fwd.x, fwd.z);
-  const heading = (((-camYaw * 180) / Math.PI) % 360 + 360) % 360; // 0 = N, 90 = L
+  const heading = ((((-camYaw * 180) / Math.PI) % 360) + 360) % 360;
   const dirs = ['N', 'NE', 'L', 'SE', 'S', 'SO', 'O', 'NO'];
-  ui.hudHeading.textContent = `Rumo ${heading.toFixed(0).padStart(3, '0')}° ${dirs[Math.round(heading / 45) % 8]}`;
+  ui.hudInfo.textContent =
+    `Rumo ${heading.toFixed(0).padStart(3, '0')}° ${dirs[Math.round(heading / 45) % 8]} · ` +
+    `Elev. ${ground >= 0 ? '+' : ''}${fmtDist(ground)} · Andou ${fmtDist(walker.walked)}`;
+  ui.hudSource.textContent =
+    `MOLA cromaticidade 1:1 + ${world.hiriseActive ? 'HiRISE perto' : 'Viking'}` +
+    (world.loadingChunk ? ' · carregando terreno…' : '');
   if (!route) return;
-  let rel = destYaw - camYaw;
+  const p = camera.position;
+  const dist = Math.hypot(route.dest.x - p.x, route.dest.z - p.z);
+  if (dist < 6 && !arrived) {
+    arrived = true;
+    toast('🎯 Destino alcançado!', 4000);
+  } else if (dist > 15) arrived = false;
+  let rel = yawOfDirection(route.dest.x - p.x, route.dest.z - p.z) - camYaw;
   rel = Math.atan2(Math.sin(rel), Math.cos(rel));
   const hFov = 2 * Math.atan(Math.tan((camera.fov * Math.PI) / 360) * camera.aspect);
-  const dist = Math.round(Math.hypot(route.dest.x, route.dest.z));
   let hint;
-  if (Math.abs(rel) < hFov / 2 * 0.8) hint = '▲ à frente';
+  if (arrived) hint = '🎯 você chegou';
+  else if (Math.abs(rel) < (hFov / 2) * 0.8) hint = '▲ à frente';
   else if (rel > 0) hint = '◀ vire à esquerda';
   else hint = 'vire à direita ▶';
-  ui.hudDest.textContent = `Destino ${dist} m (rota ${Math.round(route.total)} m) · ${hint}`;
+  ui.hudDest.textContent = `Destino ${fmtDist(dist)} · ${hint}`;
 }
 
 // ---------- Loop ----------
@@ -275,12 +417,17 @@ renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.1);
   const t = clock.elapsedTime;
   look.update(dt);
+  const ground = walker.update(dt);
+  world.update(camera.position);
   sky.position.copy(camera.position);
+  sun.position.copy(camera.position).addScaledVector(SUN_DIR, 2000);
+  sun.target.position.copy(camera.position);
   route?.update(t, camera);
   if ((hudTimer += dt) > 0.1) {
     hudTimer = 0;
-    updateHud();
+    updateHud(ground);
   }
+  ui.walkBtn.classList.toggle('active', walker.holding);
   if (stereoOn) stereo.render(scene, camera);
   else renderer.render(scene, camera);
 });

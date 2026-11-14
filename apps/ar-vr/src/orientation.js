@@ -32,6 +32,7 @@ export class LookControls {
     this.dragPitch = 0;
     this.pendingRecenter = null;
     this.lastEventAt = 0;
+    this.dragEnabled = true; // desligado no modo estéreo (lá o toque serve para andar)
 
     this._euler = new THREE.Euler();
     this._q0 = new THREE.Quaternion();
@@ -128,6 +129,7 @@ export class LookControls {
     const el = this.dom;
     el.style.touchAction = 'none';
     el.addEventListener('pointerdown', (e) => {
+      if (!this.dragEnabled) return;
       last = { x: e.clientX, y: e.clientY };
       el.setPointerCapture(e.pointerId);
     });
