@@ -1,0 +1,201 @@
+{
+    "source":  "NASA/JPL MSL MMGIS MSL_waypoints.json",
+    "sourceUrl":  "https://mars.nasa.gov/mmgis-maps/MSL/Layers/json/MSL_waypoints.json",
+    "attribution":  "NASA/JPL-Caltech",
+    "coordinateOrder":  "latitude, longitude; positive east",
+    "routeName":  "Curiosity: Gale traverse, Sol 3–159",
+    "points":  [
+                   {
+                       "lat":  -4.589467,
+                       "lon":  137.441633,
+                       "sol":  3,
+                       "site":  2,
+                       "drive":  0,
+                       "distance_m":  0
+                   },
+                   {
+                       "lat":  -4.58940312,
+                       "lon":  137.4418925,
+                       "sol":  22,
+                       "site":  3,
+                       "drive":  260,
+                       "distance_m":  27.04
+                   },
+                   {
+                       "lat":  -4.58944695,
+                       "lon":  137.4421813,
+                       "sol":  24,
+                       "site":  3,
+                       "drive":  372,
+                       "distance_m":  48.55
+                   },
+                   {
+                       "lat":  -4.58974934,
+                       "lon":  137.442476,
+                       "sol":  26,
+                       "site":  3,
+                       "drive":  530,
+                       "distance_m":  78.34
+                   },
+                   {
+                       "lat":  -4.59012126,
+                       "lon":  137.4428938,
+                       "sol":  29,
+                       "site":  4,
+                       "drive":  0,
+                       "distance_m":  108.9
+                   },
+                   {
+                       "lat":  -4.5902435,
+                       "lon":  137.4433016,
+                       "sol":  38,
+                       "site":  4,
+                       "drive":  404,
+                       "distance_m":  141.25
+                   },
+                   {
+                       "lat":  -4.59031849,
+                       "lon":  137.4436633,
+                       "sol":  39,
+                       "site":  4,
+                       "drive":  468,
+                       "distance_m":  162.94
+                   },
+                   {
+                       "lat":  -4.59003646,
+                       "lon":  137.4441777,
+                       "sol":  40,
+                       "site":  4,
+                       "drive":  916,
+                       "distance_m":  200.16
+                   },
+                   {
+                       "lat":  -4.58984662,
+                       "lon":  137.4445809,
+                       "sol":  41,
+                       "site":  4,
+                       "drive":  1238,
+                       "distance_m":  227.05
+                   },
+                   {
+                       "lat":  -4.59004164,
+                       "lon":  137.4450509,
+                       "sol":  42,
+                       "site":  4,
+                       "drive":  1632,
+                       "distance_m":  259.07
+                   },
+                   {
+                       "lat":  -4.59047623,
+                       "lon":  137.4453105,
+                       "sol":  43,
+                       "site":  4,
+                       "drive":  2002,
+                       "distance_m":  289.06
+                   },
+                   {
+                       "lat":  -4.59030037,
+                       "lon":  137.4459999,
+                       "sol":  48,
+                       "site":  4,
+                       "drive":  2644,
+                       "distance_m":  335.24
+                   },
+                   {
+                       "lat":  -4.59030545,
+                       "lon":  137.4465064,
+                       "sol":  49,
+                       "site":  4,
+                       "drive":  2778,
+                       "distance_m":  365.98
+                   },
+                   {
+                       "lat":  -4.59017575,
+                       "lon":  137.4473045,
+                       "sol":  50,
+                       "site":  4,
+                       "drive":  2956,
+                       "distance_m":  414.88
+                   },
+                   {
+                       "lat":  -4.59006187,
+                       "lon":  137.4479003,
+                       "sol":  52,
+                       "site":  4,
+                       "drive":  3200,
+                       "distance_m":  451.2
+                   },
+                   {
+                       "lat":  -4.5900627,
+                       "lon":  137.4482966,
+                       "sol":  55,
+                       "site":  4,
+                       "drive":  3416,
+                       "distance_m":  476.78
+                   },
+                   {
+                       "lat":  -4.58994723,
+                       "lon":  137.4486951,
+                       "sol":  102,
+                       "site":  5,
+                       "drive":  388,
+                       "distance_m":  517.2
+                   },
+                   {
+                       "lat":  -4.59044252,
+                       "lon":  137.4488299,
+                       "sol":  120,
+                       "site":  5,
+                       "drive":  742,
+                       "distance_m":  553.67
+                   },
+                   {
+                       "lat":  -4.59028132,
+                       "lon":  137.4491076,
+                       "sol":  121,
+                       "site":  5,
+                       "drive":  926,
+                       "distance_m":  577.87
+                   },
+                   {
+                       "lat":  -4.59005409,
+                       "lon":  137.4493493,
+                       "sol":  123,
+                       "site":  5,
+                       "drive":  1070,
+                       "distance_m":  598.26
+                   },
+                   {
+                       "lat":  -4.58963671,
+                       "lon":  137.4493306,
+                       "sol":  125,
+                       "site":  5,
+                       "drive":  1398,
+                       "distance_m":  638.41
+                   },
+                   {
+                       "lat":  -4.5892303,
+                       "lon":  137.4493834,
+                       "sol":  127,
+                       "site":  5,
+                       "drive":  1576,
+                       "distance_m":  671.22
+                   },
+                   {
+                       "lat":  -4.58946286,
+                       "lon":  137.4492584,
+                       "sol":  133,
+                       "site":  5,
+                       "drive":  1858,
+                       "distance_m":  698.54
+                   },
+                   {
+                       "lat":  -4.58953451,
+                       "lon":  137.4492382,
+                       "sol":  159,
+                       "site":  5,
+                       "drive":  1986,
+                       "distance_m":  705.95
+                   }
+               ]
+}

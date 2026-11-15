@@ -1,5 +1,8 @@
 // Locais disponíveis: os mesmos atalhos do apps/map-3d (Jezero usa o ponto de pouso exato).
 // `route` (opcional) em lat/lon; sem ela, uma rota de exemplo é gerada no rumo mais plano.
+import galeTraverse from './data/gale-curiosity-traverse.json';
+import galeObservations from './data/gale-observations.json';
+
 export const PLACES = {
   jezero: {
     name: 'Cratera Jezero · pouso do Perseverance',
@@ -18,7 +21,27 @@ export const PLACES = {
   },
   olympus: { name: 'Olympus Mons (vulcão)', lat: 18.65, lon: -133.8 },
   valles: { name: 'Valles Marineris (cânion)', lat: -13.9, lon: -59.2 },
-  gale: { name: 'Cratera Gale (Monte Sharp)', lat: -4.59, lon: 137.44 },
+  gale: {
+    name: 'Gale · rota do Curiosity (sols 3–159)',
+    lat: galeTraverse.points[0].lat,
+    lon: galeTraverse.points[0].lon,
+    telemetry: galeTraverse.points,
+    observations: galeObservations.observations,
+    observationRadiusM: galeObservations.maxDisplayDistanceM,
+    sampleSites: [
+      {
+        name: 'Rocknest · amostras CheMin',
+        lat: -4.59002152,
+        lon: 137.4483102,
+        solRange: [57, 100],
+        minerals: 'Solo basáltico: plagioclásio, olivina rica em ferro, augita e pigeonita.',
+      },
+    ],
+    route: {
+      destName: 'Fim do trecho Curiosity · sol 159',
+      points: galeTraverse.points,
+    },
+  },
 };
 export const DEFAULT_PLACE = 'jezero';
 

@@ -19,10 +19,12 @@ const TREK = 'https://trek.nasa.gov/tiles/Mars/EQ';
 const LAYERS = {
   color: { id: 'Mars_Viking_MDIM21_ClrMosaic_global_232m', ext: 'jpg', maxZ: 7 },
   relief: { id: 'Mars_MGS_MOLA_ClrShade_merge_global_463m', ext: 'jpg', maxZ: 7 },
-  // O mosaico de Jezero tem tiles até z17 (~0,3 m/px).
+  // Mosaicos regionais de alta resolução para as duas rotas com cobertura orbital.
   hirise: { id: 'NES_JEZ_MID_Visible_Mosaic_HiRISE_CTX_HRSC_GCS_MARS_07-10-2018', ext: 'png', maxZ: 17 },
+  curiosityHiRISE: { id: 'curiosity_hirise_mosaic', ext: 'png', maxZ: 17 },
 };
 const JEZERO_BOUNDS = { lonMin: 76.79, lonMax: 77.74, latMin: 17.57, latMax: 18.88 };
+const CURIOSITY_BOUNDS = { lonMin: 136.2768326, lonMax: 139.3864225, latMin: -7.2137273, latMax: -3.5804738 };
 
 export const MARS_RADIUS_M = 3389500;
 export const M_PER_DEG_LAT = (2 * Math.PI * MARS_RADIUS_M) / 360; // ~59 158 m
@@ -90,8 +92,9 @@ function makeCanvas(size) {
  * mosaico Viking MDIM 2.1 e, onde houver cobertura (Jezero), o mosaico HiRISE/CTX/HRSC por cima.
  * Cada camada é baixada no zoom NATIVO que corresponde à resolução pedida (Viking até z7, HiRISE
  * até z17) e desenhada pela posição real dos tiles, sem "zoom esticado" de tile único.
- *  - hirise: 'map2d' = como no apps/map-2d (sobreposto, opacidade 0,9);
- *            'map3d' = como no apps/map-3d (mistura de luminosidade, 0,88).
+ *  - hi-res orbital mosaics are overlaid where available (Jezero HiRISE or Curiosity HiRISE/CTX);
+ *  - hirise: 'map2d' = image overlay (opacidade 0,9);
+ *            'map3d' = mistura de luminosidade (0,88).
  */
 export async function composeRegionImage(world, cx, cz, half, { size = 1024, hirise = 'map2d', maxTiles = 64 } = {}) {
   const nw = world.toLatLon(cx - half, cz - half);
@@ -142,11 +145,17 @@ export async function composeRegionImage(world, cx, cz, half, { size = 1024, hir
   const viking = await drawLayer(ctx, LAYERS.color, zFor(LAYERS.color.maxZ));
   const sources = [`Viking MDIM 2.1 z${viking.z}`];
   let mPerPx = ((180 / 2 ** viking.z) * M_PER_DEG_LAT) / TILE;
+  let detailLayer = null;
   if (overlaps(box, JEZERO_BOUNDS)) {
+    detailLayer = LAYERS.hirise;
+  } else if (overlaps(box, CURIOSITY_BOUNDS)) {
+    detailLayer = LAYERS.curiosityHiRISE;
+  }
+  if (detailLayer) {
     const hiCanvas = makeCanvas(size);
     const hiCtx = hiCanvas.getContext('2d');
     hiCtx.imageSmoothingQuality = 'high';
-    const hi = await drawLayer(hiCtx, LAYERS.hirise, zFor(LAYERS.hirise.maxZ));
+    const hi = await drawLayer(hiCtx, detailLayer, zFor(detailLayer.maxZ));
     if (hi.loaded) {
       ctx.save();
       if (hirise === 'map3d') {

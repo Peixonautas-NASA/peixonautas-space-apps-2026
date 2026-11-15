@@ -159,7 +159,7 @@ async function init() {
   let destName;
   if (place.route) {
     camera.position.set(0, 0, 0);
-    points = place.route.points.map((p) => world.toWorld(p.lat, p.lon));
+    points = place.route.points.map((p) => ({ ...world.toWorld(p.lat, p.lon), ...p }));
     destName = place.route.destName;
   } else {
     const spot = world.findFlatSpot(0, 0); // evita nascer numa encosta (ex.: parede do cânion)
@@ -175,7 +175,7 @@ async function init() {
   walker.setPath(route.path);
 
   const homeYaw = aimYaw();
-  widgets.rebuild(world, route.path);
+  widgets.rebuild(world, route.path, place.telemetry, place.sampleSites, place.observations, place.observationRadiusM);
   widgets.get('map3d').faceYaw(homeYaw);
   widgets.layout(homeYaw);
 
@@ -413,7 +413,7 @@ function applyExag(k) {
   world.setExag(k);
   route?.relayout();
   walker.snapToGround();
-  if (route) widgets.rebuild(world, route.path);
+  if (route) widgets.rebuild(world, route.path, place.telemetry, place.sampleSites, place.observations, place.observationRadiusM);
 }
 ui.exagSlider.addEventListener('input', () => applyExag(parseFloat(ui.exagSlider.value)));
 ui.exagReset.addEventListener('click', () => applyExag(1));
