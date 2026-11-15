@@ -15,7 +15,7 @@
     .badge { font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #1f6feb; color: #fff; display: inline-block; margin-top: 4px; }
     .badge.rover { background: #238636; }
     .badge.sim { background: #9e6a03; }
-    input, select, button { width: 100%; padding: 8px; margin-top: 6px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: #fff; box-sizing: border-box; }
+    #sidebar input, #sidebar select, #sidebar button { width: 100%; padding: 8px; margin-top: 6px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: #fff; box-sizing: border-box; }
     button { background: #238636; border: none; font-weight: 600; cursor: pointer; }
     button:hover { background: #2ea043; }
     .preset-btn { background: #30363d; margin-top: 6px; font-weight: 500; }
@@ -28,6 +28,23 @@
     .grayscale-layer { filter: grayscale(100%) contrast(120%); }
     .mars-ochre-tint { filter: sepia(65%) saturate(220%) hue-rotate(-18deg) contrast(108%); }
     .false-color-thermal { filter: sepia(100%) saturate(400%) hue-rotate(-30deg) contrast(120%); }
+    #sidebar { flex-shrink: 0; }
+    #map { min-width: 0; }
+    .route-controls { display: flex; gap: 6px; }
+    .route-controls button { flex: 1; }
+    #sidebar button[aria-pressed="true"] { outline: 2px solid #58a6ff; background: #1f6feb; }
+    #sidebar button:disabled { opacity: 0.5; cursor: default; }
+    #routePanel label { display: block; margin-top: 8px; font-size: 12px; }
+    #routePanel a { color: #58a6ff; }
+    #routeStatus, #routeMetrics, #routeEndpoints { margin-top: 10px; line-height: 1.6; }
+    .route-point { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; border: 2px solid white; color: white; font-weight: 700; box-shadow: 0 2px 6px #000; }
+    .route-point-a { background: #16803c; }
+    .route-point-b { background: #1f6feb; }
+    @media (max-width: 700px) {
+      body { flex-direction: column; }
+      #sidebar { width: auto; max-height: 45vh; }
+      #map { min-height: 50vh; }
+    }
   </style>
 </head>
 <body>
@@ -35,6 +52,49 @@
     <div>
       <h2>Martian Survival Map</h2>
       <div class="subtitle">NASA Space Apps 2026 — Equipe Peixonautas</div>
+    </div>
+
+    <div class="card" id="routePanel">
+      <strong>Rotas em Marte — protótipo regional</strong>
+      <label>Fonte do terreno
+        <select id="terrainMode">
+          <option value="local">Gale local — HRSC 30 m</option>
+          <option value="auto">Automático — buscar terreno para A/B</option>
+        </select>
+      </label>
+      <div class="subtitle" id="terrainSourceInfo">Curiosity e sopé do Monte Sharp · DTM HRSC de 30 m</div>
+      <div class="route-controls">
+        <button id="selectRouteA" type="button" aria-pressed="false">Marcar A</button>
+        <button id="selectRouteB" type="button" aria-pressed="false">Marcar B</button>
+      </div>
+      <button class="preset-btn" id="focusRouteArea" type="button">Ver área de interesse</button>
+      <div id="routeEndpoints"></div>
+      <details style="margin-top:8px;">
+        <summary>Inserir coordenadas A/B</summary>
+        <label>Latitude A <input id="routeLatA" type="number" step="any" min="-75" max="75" value="-4.59" /></label>
+        <label>Longitude A <input id="routeLonA" type="number" step="any" min="-180" max="180" value="137.44" /></label>
+        <label>Latitude B <input id="routeLatB" type="number" step="any" min="-75" max="75" value="-4.68" /></label>
+        <label>Longitude B <input id="routeLonB" type="number" step="any" min="-180" max="180" value="137.42" /></label>
+        <button id="applyRouteCoordinates" class="preset-btn" type="button">Usar estas coordenadas</button>
+      </details>
+      <label>Peso da distância
+        <input id="weightDistance" type="number" min="0.1" max="100" step="0.1" value="1" />
+      </label>
+      <label>Peso da inclinação
+        <input id="weightSlope" type="number" min="0" max="100" step="0.5" value="3" />
+      </label>
+      <label>Peso da subida acumulada
+        <input id="weightAscent" type="number" min="0" max="100" step="0.5" value="5" />
+      </label>
+      <label>Inclinação máxima da grade (graus)
+        <input id="routeMaxSlope" type="number" min="1" max="60" step="1" value="25" />
+      </label>
+      <button id="calculateRoute" type="button">Calcular rota A → B</button>
+      <button class="preset-btn" id="exportRoute" type="button" disabled>Exportar GeoJSON</button>
+      <div id="routeStatus" role="status" aria-live="polite">Preparando terreno...</div>
+      <div id="routeMetrics"></div>
+      <p class="subtitle">Pesos e limite são hipóteses ajustáveis do protótipo. Sem dados locais de areia, blocos ou clima no custo. A resolução escolhida limita o detalhe das inclinações e dos obstáculos; não é validação de segurança operacional.</p>
+      <a id="terrainSourceLink" href="https://zenodo.org/records/5808354" target="_blank" rel="noopener noreferrer">Fonte do terreno</a>
     </div>
 
     <div class="card">
@@ -47,11 +107,14 @@
       <div id="colorModeNote" class="subtitle" style="margin-top:6px;">
         Exibe as camadas oficiais (Viking Color, altimetria MOLA e P&B) sem filtros adicionais.
       </div>
+      <div id="molaLegend" hidden>
       <div class="legend-bar"></div>
       <div class="legend-labels">
         <span>Baixa altitude (MOLA)</span>
         <span>Planície</span>
         <span>Alta altitude</span>
+      </div>
+      <div class="subtitle">Legenda qualitativa MOLA; imagem colorida com sombreado, sem leitura numérica de altitude.</div>
       </div>
     </div>
 
@@ -97,7 +160,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     const marsBounds = [[-90, -180], [90, 180]];
-    const transparentTile = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
     const map = L.map('map', {
       crs: L.CRS.EPSG4326,
@@ -109,44 +171,79 @@
     });
 
     const statusState = {};
-    function setLayerStatus(key, text) {
-      statusState[key] = text;
-      document.getElementById('layerStatus').innerHTML = Object.values(statusState)
-        .map(line => `<div>${line}</div>`)
-        .join('');
+    function renderLayerStatuses() {
+      const lines = Object.values(statusState);
+      document.getElementById('layerStatus').innerHTML = lines.length
+        ? lines.map(line => '<div>' + line + '</div>').join('')
+        : 'Nenhuma camada ativa.';
     }
 
     function createDirectTrekLayer(key, label, urls, options = {}) {
-      let urlIndex = 0;
+      const coverage = L.latLngBounds(options.bounds || marsBounds);
       const layer = L.tileLayer(urls[0], {
         attribution: options.attribution || 'NASA / JPL / Mars Trek',
-        bounds: options.bounds || marsBounds,
+        bounds: coverage,
         noWrap: true,
         minNativeZoom: 0,
-        maxNativeZoom: options.maxNativeZoom || 7,
+        maxNativeZoom: options.maxNativeZoom ?? 7,
         maxZoom: 13,
         opacity: options.opacity ?? 1,
-        className: options.className || '',
-        errorTileUrl: transparentTile
+        className: options.className || ''
       });
-
-      layer.on('tileload', () => {
-        const note = options.note ? ` (${options.note})` : '';
-        const statusText = `✅ <b>${label}</b>${note}`;
-        if (statusState[key] !== statusText) {
-          setLayerStatus(key, statusText);
+      // Track real tile outcomes; a broken image must never become a success.
+      const tiles = new Map();
+      function updateStatus() {
+        if (!map.hasLayer(layer)) {
+          delete statusState[key];
+          renderLayerStatuses();
+          return;
         }
-      });
-
-      layer.on('tileerror', () => {
-        if (urlIndex + 1 < urls.length) {
-          urlIndex++;
-          layer.setUrl(urls[urlIndex]);
-        } else if (!statusState[key]?.startsWith('✅')) {
-          setLayerStatus(key, `⚠️ Indisponível neste zoom/região: <b>${label}</b>`);
+        const view = map.getBounds();
+        const nativeZoom = Math.max(0, Math.min(map.getZoom(), layer.options.maxNativeZoom));
+        let loaded = 0, failed = 0, pending = 0;
+        for (const { coords, state } of tiles.values()) {
+          if (coords.z !== nativeZoom) continue;
+          const tileBounds = L.latLngBounds(
+            map.unproject([coords.x * 256, coords.y * 256], coords.z),
+            map.unproject([(coords.x + 1) * 256, (coords.y + 1) * 256], coords.z)
+          );
+          if (!view.intersects(tileBounds)) continue;
+          if (state === 'loaded') loaded++;
+          else if (state === 'failed') failed++;
+          else pending++;
         }
+        const note = options.note ? ' (' + options.note + ')' : '';
+        const enlarged = map.getZoom() > layer.options.maxNativeZoom
+          ? ' — ampliada, sem detalhe adicional' : '';
+        let text;
+        if (!view.intersects(coverage)) text = 'ℹ️ Fora da cobertura';
+        else if (failed) text = loaded ? '⚠️ Cobertura parcial: ' + loaded + ' tiles, ' + failed + ' falhas' : '⚠️ Falha ao carregar tiles';
+        else if (pending) text = '⏳ Carregando';
+        else if (loaded) text = '✅ Carregada';
+        else text = '⏳ Aguardando tiles';
+        statusState[key] = text + ': <b>' + label + '</b>' + note + enlarged;
+        renderLayerStatuses();
+      }
+      layer.on('tileloadstart', event => {
+        tiles.set(event.tile, { coords: event.coords, state: 'pending' });
+        updateStatus();
       });
-
+      layer.on('tileload', event => {
+        const tile = tiles.get(event.tile);
+        if (tile && tile.state !== 'failed') tile.state = 'loaded';
+        updateStatus();
+      });
+      layer.on('tileerror', event => {
+        const tile = tiles.get(event.tile);
+        if (tile) tile.state = 'failed';
+        updateStatus();
+      });
+      layer.on('tileunload', event => {
+        tiles.delete(event.tile);
+        updateStatus();
+      });
+      layer.on('add remove load', updateStatus);
+      map.on('moveend', updateStatus);
       return layer;
     }
 
@@ -201,13 +298,12 @@
       'themisIR',
       'Térmico Diurno (THEMIS IR)',
       [
-        'https://trek.nasa.gov/tiles/Mars/EQ/THEMIS_DayIR_ControlledMosaics_100m_v2_oct2018/1.0.0/default/default028mm/{z}/{y}/{x}.png',
-        'https://trek.nasa.gov/tiles/Mars/EQ/THEMIS_DayIR_ControlledMosaics_100m_v2_oct2018/1.0.0/default/default028mm/{z}/{y}/{x}.jpg'
+        'https://trek.nasa.gov/tiles/Mars/EQ/THEMIS_DayIR_ControlledMosaics_100m_v2_oct2018/1.0.0/default/default028mm/{z}/{y}/{x}.png'
       ],
       {
         attribution: 'NASA / JPL / ASU (Mars Odyssey THEMIS Day IR)',
         bounds: [[-65, -180], [65, 180]],
-        maxNativeZoom: 8
+        maxNativeZoom: 9
       }
     );
 
@@ -226,17 +322,32 @@
       }
     );
 
+    const galeHiRise = createDirectTrekLayer(
+      'hiriseGale',
+      'Alta Resolução Gale (HiRISE Curiosity)',
+      [
+        'https://trek.nasa.gov/tiles/Mars/EQ/curiosity_hirise_mosaic/1.0.0/default/default028mm/{z}/{y}/{x}.png'
+      ],
+      {
+        attribution: 'NASA / JPL / UArizona (HiRISE Curiosity, Gale)',
+        bounds: [[-4.9254743, 137.1224669], [-4.2489588, 137.7298129]],
+        maxNativeZoom: 13,
+        opacity: 0.9
+      }
+    );
+
     const tesDust = createDirectTrekLayer(
       'tesDust',
       'Poeira Atmosférica (TES)',
       [
         'https://trek.nasa.gov/tiles/Mars/EQ/TES_Dust/1.0.0/default/default028mm/{z}/{y}/{x}.png'
       ],
-      { attribution: 'NASA / JPL / ASU (MGS TES)', maxNativeZoom: 5, opacity: 0.45 }
+      { attribution: 'NASA / JPL / ASU (MGS TES)', maxNativeZoom: 1, opacity: 0.45 }
     );
 
     vikingColor.addTo(map);
     jezeroHiRise.addTo(map);
+    galeHiRise.addTo(map);
 
     L.control.layers(
       {
@@ -248,6 +359,7 @@
       },
       {
         "Alta Resolução Jezero (HiRISE)": jezeroHiRise,
+        "Alta Resolução Gale (HiRISE Curiosity)": galeHiRise,
         "Poeira Atmosférica (TES Dust)": tesDust
       },
       { collapsed: false }
@@ -255,21 +367,27 @@
 
     function applyColorMode() {
       const mode = document.getElementById('colorModeSelect').value;
-      const pane = map.getPane('tilePane');
+      // Enhance optical imagery only. Preserve the MOLA/TES/THEMIS palettes.
+      for (const layer of [vikingColor, vikingGray, jezeroHiRise]) {
+        const container = layer.getContainer();
+        if (!container) continue;
+        container.classList.remove('mars-ochre-tint', 'false-color-thermal');
+        if (mode === 'ochre-tint') container.classList.add('mars-ochre-tint');
+        if (mode === 'thermal-false') container.classList.add('false-color-thermal');
+      }
+      document.getElementById('molaLegend').hidden = !map.hasLayer(molaColor);
       const noteEl = document.getElementById('colorModeNote');
-
-      pane.classList.remove('mars-ochre-tint', 'false-color-thermal');
-
       if (mode === 'natural') {
-        noteEl.innerText = "Exibe as camadas oficiais (Viking Color, altimetria MOLA e P&B) sem filtros adicionais.";
-      } else if (mode === 'ochre-tint') {
-        pane.classList.add('mars-ochre-tint');
-        noteEl.innerText = "Realce visual (tonalidade ocre) aplicado para simular cor natural sobre camadas em escala de cinza.";
-      } else if (mode === 'thermal-false') {
-        pane.classList.add('false-color-thermal');
-        noteEl.innerText = "Realce visual em falsa cor para destacar variações de contraste e relevo.";
+        noteEl.innerText = 'Exibe as imagens originais, sem realces adicionais.';
+      } else {
+        noteEl.innerText = (mode === 'ochre-tint'
+          ? 'Realce ocre aplicado às imagens ópticas; não representa cor natural medida.'
+          : 'Falsa cor aplicada às imagens ópticas; não representa temperatura.')
+          + ' As paletas MOLA, TES e THEMIS são preservadas.';
       }
     }
+    map.on('layeradd layerremove', applyColorMode);
+    applyColorMode();
 
     let currentMarker = L.marker([18.4, 77.5]).addTo(map)
       .bindPopup("<b>Cratera Jezero (Área Candidata)</b><br/>18.40°N, 77.50°E").openPopup();
@@ -322,6 +440,7 @@
     }
 
     map.on('click', (e) => {
+      if (document.querySelector('#routePanel button[aria-pressed="true"]')) return;
       const { lat, lng } = e.latlng;
       document.getElementById('latInput').value = lat.toFixed(2);
       document.getElementById('lonInput').value = lng.toFixed(2);
@@ -329,5 +448,8 @@
       updateTelemetry(lat, lng);
     });
   </script>
+  <script src="../../packages/shared/navigation/planner.js"></script>
+  <script src="../../data/gale/terrain.js"></script>
+  <script src="route-planner.js"></script>
 </body>
 </html>

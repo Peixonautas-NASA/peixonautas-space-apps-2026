@@ -1,0 +1,43 @@
+{
+ "center": {
+  "lat": -4.59,
+  "lon": 137.44
+ },
+ "levels": [
+  {
+   "file": "hirise_8m.bin",
+   "type": "uint16dm",
+   "w": 1500,
+   "h": 1500,
+   "base": -4544,
+   "cell": 8,
+   "x0": 8140713.492786024,
+   "y0": -266069.075189438,
+   "R": 3396190.0,
+   "source": "USGS Mars MSL Gale Merged DEM 1m v3 (HiRISE)"
+  },
+  {
+   "file": "hirise_2m.bin",
+   "type": "uint16dm",
+   "w": 1500,
+   "h": 1500,
+   "base": -4531,
+   "cell": 2,
+   "x0": 8145213.492786024,
+   "y0": -270571.075189438,
+   "R": 3396190.0,
+   "source": "USGS Mars MSL Gale Merged DEM 1m v3 (HiRISE)"
+  }
+ ],
+ "crater": {
+  "file": "crater_200m.bin",
+  "type": "int16",
+  "w": 1097,
+  "h": 1068,
+  "nodata": -32768,
+  "lonMin": 135.898688647933,
+  "latMax": -3.399038712973521,
+  "step": 0.003374120830641,
+  "source": "USGS Mars MGS MOLA - MEX HRSC Blended DEM Global 200m v2"
+ }
+}

@@ -25,6 +25,8 @@ export const PLACES = {
     name: 'Gale · rota do Curiosity (sols 3–159)',
     lat: galeTraverse.points[0].lat,
     lon: galeTraverse.points[0].lon,
+    exactStart: true,
+    dem: 'gale',
     telemetry: galeTraverse.points,
     observations: galeObservations.observations,
     observationRadiusM: galeObservations.maxDisplayDistanceM,
@@ -43,7 +45,7 @@ export const PLACES = {
     },
   },
 };
-export const DEFAULT_PLACE = 'jezero';
+export const DEFAULT_PLACE = 'gale'; // ponto de localização da equipe: Cratera Gale (-4,59; 137,44)
 
 /** Rota de exemplo genérica: ~800 m com uma curva, saindo de (x, z) no rumo `yaw` (o mais plano). */
 export function exampleRouteFrom(x, z, yaw) {

@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { StereoEffect } from 'three/addons/effects/StereoEffect.js';
 import { TerrainWorld } from './terrain.js';
+import { GaleDem } from './galeDem.js';
+import { DetailTerrain } from './detailTerrain.js';
 import { LookControls, yawOfDirection } from './orientation.js';
 import { Walker } from './locomotion.js';
 import { WidgetManager, Map2DWidget, Map3DWidget } from './widgets.js';
@@ -137,7 +139,7 @@ const widgets = new WidgetManager({ scene, camera, dom: renderer.domElement });
 const DEG = Math.PI / 180;
 widgets.add(new Map2DWidget(), { daz: 31 * DEG, el: -12 * DEG }); // à esquerda
 widgets.add(new Map3DWidget(renderer), { daz: -31 * DEG, el: -12 * DEG }); // à direita
-if (params.has('debug')) window.__vr = { camera, widgets, walker, look, world }; // testes automatizados
+if (params.has('debug')) window.__vr = { camera, widgets, walker, look, world, get detail() { return detail; } }; // testes automatizados
 widgets.onChange = () => {
   ui.map2dBtn.classList.toggle('on', widgets.get('map2d').open);
   ui.map3dBtn.classList.toggle('on', widgets.get('map3d').open);
@@ -151,8 +153,18 @@ function aimYaw() {
   return yawOfDirection(ahead.x - p.x, ahead.z - p.z);
 }
 
+let detail = null; // malhas detalhadas sobre o DEM real (só onde há DEM, ex.: Gale)
+
 async function init() {
   ui.loadingPlace.textContent = place.name;
+  if (place.dem === 'gale') {
+    // Relevo REAL: DEM HiRISE (2 m / 8 m) + DEM HRSC/MOLA (200 m), gerados por tools/build_gale_dem.py
+    ui.loadingText.textContent = 'Baixando relevo real da cratera (DEM HiRISE + HRSC/MOLA)…';
+    world.dem = await GaleDem.load();
+    // textura procedural desligada: aqui todo o detalhe do chão é dado real
+    ui.detailToggle.checked = false;
+    world.setDetail(false);
+  }
   await world.init((d, t) => (ui.loadingText.textContent = `Baixando tiles NASA Trek… ${d}/${t}`));
   // Rota: a do local (lat/lon) ou uma de exemplo saindo do ponto mais plano por perto
   let points;
@@ -162,10 +174,15 @@ async function init() {
     points = place.route.points.map((p) => ({ ...world.toWorld(p.lat, p.lon), ...p }));
     destName = place.route.destName;
   } else {
-    const spot = world.findFlatSpot(0, 0); // evita nascer numa encosta (ex.: parede do cânion)
+    // evita nascer numa encosta (ex.: parede do cânion), exceto quando o ponto exato importa
+    const spot = place.exactStart ? { x: 0, z: 0 } : world.findFlatSpot(0, 0);
     camera.position.set(spot.x, 0, spot.z);
     points = exampleRouteFrom(spot.x, spot.z, world.yawFlattest(spot.x, spot.z));
     destName = 'Destino de exemplo';
+  }
+  if (world.dem) {
+    detail = new DetailTerrain(world, scene);
+    detail.init(world.toWorld(world.dem.meta.center.lat, world.dem.meta.center.lon), camera.position);
   }
   walker.snapToGround();
   route = buildRoute(world, points, destName);
@@ -411,6 +428,7 @@ function applyExag(k) {
   ui.exagSlider.value = k;
   ui.exagVal.textContent = k === 1 ? '1.0x (real 1:1)' : `${k.toFixed(1)}x`;
   world.setExag(k);
+  detail?.rebuild();
   route?.relayout();
   walker.snapToGround();
   if (route) widgets.rebuild(world, route.path, place.telemetry, place.sampleSites, place.observations, place.observationRadiusM);
@@ -451,8 +469,13 @@ function updateHud(ground, camYaw, hFov) {
   ui.hudInfo.textContent =
     `${heading.toFixed(0).padStart(3, '0')}° ${DIRS[Math.round(heading / 45) % 8]} · ` +
     `elev. ${ground >= 0 ? '+' : ''}${fmtDist(ground)} · andou ${fmtDist(walker.walked)}`;
+  const here = world.toLatLon(camera.position.x, camera.position.z);
+  const demRes = world.dem?.resolutionAt(here.lat, here.lon);
+  const relief = demRes
+    ? `DEM real ${demRes === 200 ? 'HRSC/MOLA 200 m' : `HiRISE ${demRes} m`}`
+    : 'MOLA cromaticidade 1:1';
   ui.hudSource.textContent =
-    `Agora: MOLA cromaticidade 1:1 + ${world.hiriseActive ? 'HiRISE perto' : 'Viking'}` +
+    `Agora: ${relief} + ${world.hiriseActive ? 'HiRISE/CTX perto' : 'Viking'}` +
     (world.loadingChunk ? ' · carregando terreno…' : '');
   if (!route) return;
   const p = camera.position;
@@ -477,6 +500,7 @@ renderer.setAnimationLoop(() => {
   look.update(dt);
   const ground = walker.update(dt);
   world.update(camera.position);
+  detail?.update(camera.position);
   camera.getWorldDirection(fwd);
   const camYaw = yawOfDirection(fwd.x, fwd.z);
   const hFov = 2 * Math.atan(Math.tan((camera.fov * Math.PI) / 360) * camera.aspect);

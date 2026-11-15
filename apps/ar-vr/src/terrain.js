@@ -1,12 +1,12 @@
 // Mundo caminhável em ESCALA REAL (1 unidade = 1 metro) com o mesmo relevo do apps/map-3d:
 // MOLA ClrShade decodificado por cromaticidade (-8,2 a +21,2 km), sombras preenchidas e
-// suavização gaussiana (ver mola.js). Cor: Viking. Em Jezero: detalhe HiRISE perto do usuário.
+// suavização gaussiana (ver mola.js). Cor: Viking. Em Jezero e Gale: detalhe HiRISE perto do usuário.
 //
 // Organização:
 //  - "Bloco" (chunk): 3x3 tiles em z7 (~250 km). É o maior zoom NATIVO do MOLA/Viking no
 //    NASA Trek, então mais zoom não traz informação nova de relevo. Quando a pessoa atravessa
 //    para outro tile, um novo bloco centrado nela é carregado e substitui o anterior.
-//  - "Remendos" HiRISE (só Jezero): texturas de alta resolução misturadas no shader do terreno
+//  - "Remendos" HiRISE (Jezero e Gale): texturas de alta resolução misturadas no shader do terreno
 //    por posição no mundo. Não são malhas extras, então não há z-fighting nem costura.
 //  - Textura procedural de detalhe perto dos pés (não é dado real, só referência visual de
 //    movimento). Pode ser desligada nos ajustes.
@@ -19,12 +19,35 @@ const TREK = 'https://trek.nasa.gov/tiles/Mars/EQ';
 const LAYERS = {
   color: { id: 'Mars_Viking_MDIM21_ClrMosaic_global_232m', ext: 'jpg', maxZ: 7 },
   relief: { id: 'Mars_MGS_MOLA_ClrShade_merge_global_463m', ext: 'jpg', maxZ: 7 },
-  // Mosaicos regionais de alta resolução para as duas rotas com cobertura orbital.
-  hirise: { id: 'NES_JEZ_MID_Visible_Mosaic_HiRISE_CTX_HRSC_GCS_MARS_07-10-2018', ext: 'png', maxZ: 17 },
-  curiosityHiRISE: { id: 'curiosity_hirise_mosaic', ext: 'png', maxZ: 17 },
 };
-const JEZERO_BOUNDS = { lonMin: 76.79, lonMax: 77.74, latMin: 17.57, latMax: 18.88 };
-const CURIOSITY_BOUNDS = { lonMin: 136.2768326, lonMax: 139.3864225, latMin: -7.2137273, latMax: -3.5804738 };
+// Mosaicos de alta resolução do NASA Trek (cobertura local). A área de cada um vem do
+// WMTSCapabilities.xml do próprio Trek.
+export const HIRISE_MOSAICS = [
+  {
+    // Jezero: HiRISE + CTX + HRSC, tiles até z17 (~0,3 m/px)
+    id: 'NES_JEZ_MID_Visible_Mosaic_HiRISE_CTX_HRSC_GCS_MARS_07-10-2018',
+    ext: 'png',
+    maxZ: 17,
+    label: 'HiRISE/CTX Jezero',
+    bounds: { lonMin: 76.79, lonMax: 77.74, latMin: 17.57, latMax: 18.88 },
+  },
+  {
+    // Gale: mosaico HiRISE da área do Curiosity (camada do bookmark "Curiosity Landing Site"), até z16
+    id: 'curiosity_hirise_mosaic',
+    ext: 'png',
+    maxZ: 16,
+    label: 'HiRISE Curiosity (Gale)',
+    bounds: { lonMin: 137.1224669, lonMax: 137.7298129, latMin: -4.9254743, latMax: -4.2489588 },
+  },
+  {
+    // Gale inteira: mosaico CTX (MRO), ~6 m/px, até z12
+    id: 'Gale_CTX_BlockAdj_dd',
+    ext: 'png',
+    maxZ: 12,
+    label: 'CTX Gale',
+    bounds: { lonMin: 135.1842593, lonMax: 139.2413012, latMin: -6.5732988, latMax: -2.8077809 },
+  },
+];
 
 export const MARS_RADIUS_M = 3389500;
 export const M_PER_DEG_LAT = (2 * Math.PI * MARS_RADIUS_M) / 360; // ~59 158 m
@@ -52,7 +75,11 @@ function tileBounds(tx, ty, z) {
   };
 }
 const overlaps = (a, b) => !(a.lonMax < b.lonMin || a.lonMin > b.lonMax || a.latMax < b.latMin || a.latMin > b.latMax);
-export const isInJezero = (lat, lon) => overlaps({ lonMin: lon, lonMax: lon, latMin: lat, latMax: lat }, JEZERO_BOUNDS);
+/** Mosaico de alta resolução que cobre o ponto (o mais detalhado), ou null. */
+export const hiriseMosaicAt = (lat, lon) =>
+  HIRISE_MOSAICS.filter((m) => overlaps({ lonMin: lon, lonMax: lon, latMin: lat, latMax: lat }, m.bounds)).sort(
+    (a, b) => b.maxZ - a.maxZ
+  )[0] ?? null;
 
 const imageCache = new Map();
 function fetchImage(url) {
@@ -89,16 +116,22 @@ function makeCanvas(size) {
 
 /**
  * Imagem REAL do NASA Trek para um quadrado do mundo [cx +- half] x [cz +- half], sem filtros:
- * mosaico Viking MDIM 2.1 e, onde houver cobertura (Jezero), o mosaico HiRISE/CTX/HRSC por cima.
+ * mosaico Viking MDIM 2.1 e, onde houver cobertura (Jezero, Gale), o mosaico HiRISE por cima.
  * Cada camada é baixada no zoom NATIVO que corresponde à resolução pedida (Viking até z7, HiRISE
  * até z17) e desenhada pela posição real dos tiles, sem "zoom esticado" de tile único.
  *  - hi-res orbital mosaics are overlaid where available (Jezero HiRISE or Curiosity HiRISE/CTX);
  *  - hirise: 'map2d' = image overlay (opacidade 0,9);
  *            'map3d' = mistura de luminosidade (0,88).
  */
-export async function composeRegionImage(world, cx, cz, half, { size = 1024, hirise = 'map2d', maxTiles = 64 } = {}) {
-  const nw = world.toLatLon(cx - half, cz - half);
-  const se = world.toLatLon(cx + half, cz + half);
+export async function composeRegionImage(
+  world,
+  cx,
+  cz,
+  half,
+  { size = 1024, hirise = 'map2d', maxTiles = 64, halfZ = half } = {}
+) {
+  const nw = world.toLatLon(cx - half, cz - halfZ);
+  const se = world.toLatLon(cx + half, cz + halfZ);
   const box = { lonMin: nw.lon, lonMax: se.lon, latMax: nw.lat, latMin: se.lat };
   const canvas = makeCanvas(size);
   const ctx = canvas.getContext('2d');
@@ -145,17 +178,12 @@ export async function composeRegionImage(world, cx, cz, half, { size = 1024, hir
   const viking = await drawLayer(ctx, LAYERS.color, zFor(LAYERS.color.maxZ));
   const sources = [`Viking MDIM 2.1 z${viking.z}`];
   let mPerPx = ((180 / 2 ** viking.z) * M_PER_DEG_LAT) / TILE;
-  let detailLayer = null;
-  if (overlaps(box, JEZERO_BOUNDS)) {
-    detailLayer = LAYERS.hirise;
-  } else if (overlaps(box, CURIOSITY_BOUNDS)) {
-    detailLayer = LAYERS.curiosityHiRISE;
-  }
-  if (detailLayer) {
+  for (const mosaic of [...HIRISE_MOSAICS].sort((a, b) => a.maxZ - b.maxZ)) {
+    if (!overlaps(box, mosaic.bounds)) continue;
     const hiCanvas = makeCanvas(size);
     const hiCtx = hiCanvas.getContext('2d');
     hiCtx.imageSmoothingQuality = 'high';
-    const hi = await drawLayer(hiCtx, detailLayer, zFor(detailLayer.maxZ));
+    const hi = await drawLayer(hiCtx, mosaic, zFor(mosaic.maxZ));
     if (hi.loaded) {
       ctx.save();
       if (hirise === 'map3d') {
@@ -164,7 +192,7 @@ export async function composeRegionImage(world, cx, cz, half, { size = 1024, hir
       } else ctx.globalAlpha = 0.9;
       ctx.drawImage(hiCanvas, 0, 0);
       ctx.restore();
-      sources.push(`HiRISE/CTX z${hi.z}`);
+      sources.push(`${mosaic.label} z${hi.z}`);
       mPerPx = ((180 / 2 ** hi.z) * M_PER_DEG_LAT) / TILE;
     }
   }
@@ -172,6 +200,9 @@ export async function composeRegionImage(world, cx, cz, half, { size = 1024, hir
 }
 
 // ---------- Shader do terreno: remendos HiRISE + detalhe procedural ----------
+/** Retângulo (xMin, zMin, xMax, zMax) onde a malha não desenha: ali há uma malha mais detalhada. */
+export const makeHoleUniform = () => ({ value: new THREE.Vector4(1, 1, -1, -1) });
+
 function makeTerrainUniforms() {
   const blank = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1);
   blank.needsUpdate = true;
@@ -181,9 +212,10 @@ function makeTerrainUniforms() {
     uDetail: { value: 1 },
   };
 }
-function enhanceTerrainMaterial(material, uniforms) {
+export function enhanceTerrainMaterial(material, uniforms, hole = makeHoleUniform()) {
+  material.userData.hole = hole;
   material.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, uniforms);
+    Object.assign(shader.uniforms, uniforms, { uHole: hole });
     shader.vertexShader =
       'varying vec3 vWPos;\n' +
       shader.vertexShader.replace(
@@ -193,6 +225,7 @@ function enhanceTerrainMaterial(material, uniforms) {
     shader.fragmentShader =
       /* glsl */ `
 varying vec3 vWPos;
+uniform vec4 uHole;
 uniform sampler2D uP1; uniform vec4 uR1; uniform float uH1;
 uniform sampler2D uP2; uniform vec4 uR2; uniform float uH2;
 uniform float uDetail;
@@ -212,6 +245,7 @@ vec4 pxPatch(sampler2D t, vec4 r, vec2 p) {
         /* glsl */ `#include <map_fragment>
   {
     vec2 p = vWPos.xz;
+    if (p.x > uHole.x && p.x < uHole.z && p.y > uHole.y && p.y < uHole.w) discard;
     if (uH1 > 0.5) { vec4 c = pxPatch(uP1, uR1, p); diffuseColor.rgb = mix(diffuseColor.rgb, c.rgb, c.a); }
     if (uH2 > 0.5) { vec4 c = pxPatch(uP2, uR2, p); diffuseColor.rgb = mix(diffuseColor.rgb, c.rgb, c.a); }
     float fade = (1.0 - smoothstep(15.0, 350.0, distance(vWPos, cameraPosition))) * uDetail;
@@ -288,6 +322,21 @@ async function buildChunk(world, tileX, tileY, exag, onProgress) {
   const geometry = new THREE.PlaneGeometry(width, depth, seg, seg);
   geometry.rotateX(-Math.PI / 2); // linha iy=0 -> -Z (norte), igual à linha 0 do canvas
   geometry.translate(nw.x + width / 2, 0, nw.z + depth / 2);
+  // Relevo REAL (DEM oficial) onde houver: substitui a reconstrução por cromaticidade, com
+  // transição suave na borda da janela do DEM. NaN = sem DEM (fica a reconstrução).
+  const real = new Float32Array(n * n).fill(NaN);
+  const realW = new Float32Array(n * n);
+  if (world.dem) {
+    const gpos = geometry.attributes.position;
+    for (let i = 0; i < n * n; i++) {
+      const ll = world.toLatLon(gpos.getX(i), gpos.getZ(i));
+      const h = world.dem.heightAt(ll.lat, ll.lon);
+      if (h !== null) {
+        real[i] = h;
+        realW[i] = world.dem.edgeWeight(ll.lat, ll.lon);
+      }
+    }
+  }
   const heights = new Float32Array(n * n);
   const cellW = width / seg;
   const cellD = depth / seg;
@@ -343,13 +392,31 @@ async function buildChunk(world, tileX, tileY, exag, onProgress) {
   colorTex.colorSpace = THREE.SRGBColorSpace;
   colorTex.anisotropy = 8;
   const material = new THREE.MeshStandardMaterial({ map: colorTex, roughness: 0.92, metalness: 0.02 });
-  enhanceTerrainMaterial(material, world.uniforms);
+  enhanceTerrainMaterial(material, world.uniforms, world.chunkHole);
   const mesh = new THREE.Mesh(geometry, material);
+  if (world.dem) {
+    // Na cratera: textura mais fina (CTX ~6 m/px + HiRISE) para o bloco inteiro, baixada em segundo plano
+    composeRegionImage(world, nw.x + width / 2, nw.z + depth / 2, width / 2, {
+      halfZ: depth / 2,
+      size: 4096,
+      hirise: 'map3d',
+      maxTiles: 160,
+    }).then((img) => {
+      if (!img.sources.some((src) => src.startsWith('CTX'))) return;
+      const tex = new THREE.CanvasTexture(img.canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 8;
+      material.map = tex;
+      material.needsUpdate = true;
+      colorTex.dispose();
+    });
+  }
 
   function setExag(ex) {
     const pos = geometry.attributes.position;
     for (let i = 0; i < n * n; i++) {
-      heights[i] = normToMeters(vNorm[i], ex);
+      const mola = normToMeters(vNorm[i], ex);
+      heights[i] = Number.isNaN(real[i]) ? mola : mola + (real[i] * ex - mola) * realW[i];
       pos.setY(i, heights[i]);
     }
     pos.needsUpdate = true;
@@ -359,7 +426,8 @@ async function buildChunk(world, tileX, tileY, exag, onProgress) {
     geometry.computeTangents();
     geometry.computeBoundingSphere();
     material.normalMap?.dispose();
-    material.normalMap = buildNormalMap(ex);
+    // Com DEM real, as normais da própria malha valem; o normal map da cromaticidade estaria errado
+    material.normalMap = world.dem ? null : buildNormalMap(ex);
     material.needsUpdate = true;
   }
   setExag(exag);
@@ -382,7 +450,7 @@ async function buildChunk(world, tileX, tileY, exag, onProgress) {
 }
 
 // ---------- Remendo HiRISE (textura misturada no shader) ----------
-async function buildHirisePatch(world, lat, lon, zoom, grid) {
+async function buildHirisePatch(world, lat, lon, zoom, grid, mosaic) {
   const half = Math.floor(grid / 2);
   const center = latLonToTile(lat, lon, zoom);
   const size = TILE * grid;
@@ -395,11 +463,11 @@ async function buildHirisePatch(world, lat, lon, zoom, grid) {
     for (let gx = -half; gx <= half; gx++) {
       const tx = center.x + gx;
       const ty = center.y + gy;
-      if (!overlaps(tileBounds(tx, ty, zoom), JEZERO_BOUNDS)) continue;
+      if (!overlaps(tileBounds(tx, ty, zoom), mosaic.bounds)) continue;
       const dx = (gx + half) * TILE;
       const dy = (gy + half) * TILE;
       tasks.push(drawLayerTile(vCtx, LAYERS.color, zoom, tx, ty, dx, dy));
-      tasks.push(drawLayerTile(hCtx, LAYERS.hirise, zoom, tx, ty, dx, dy).then((ok) => (ok ? 1 : 0)));
+      tasks.push(drawLayerTile(hCtx, mosaic, zoom, tx, ty, dx, dy).then((ok) => (ok ? 1 : 0)));
     }
   }
   const results = await Promise.all(tasks);
@@ -443,9 +511,11 @@ export class TerrainWorld {
     this.chunk = null;
     this.loadingChunk = false;
     this.onChunkChange = () => {};
+    this.dem = null; // relevo real (GaleDem), quando o local tem
+    this.chunkHole = makeHoleUniform();
     this.patches = [
       { zoom: 12, grid: 5, recenterDist: 3000, slot: 1, cur: null, loading: false }, // ~13 km, ~10 m/px
-      { zoom: 15, grid: 5, recenterDist: 350, slot: 2, cur: null, loading: false }, // ~1,6 km, ~1,3 m/px
+      { zoom: 16, grid: 7, recenterDist: 300, slot: 2, cur: null, loading: false }, // ~1,1 km, ~0,65 m/px
     ];
   }
 
@@ -456,6 +526,14 @@ export class TerrainWorld {
     return { lat: this.anchor.lat - z / M_PER_DEG_LAT, lon: this.anchor.lon + x / this.mPerDegLon };
   }
   heightAt(x, z) {
+    if (this.dem) {
+      const ll = this.toLatLon(x, z);
+      // fora da faixa de transição da borda, o DEM puro (igual às malhas detalhadas)
+      if (this.dem.edgeWeight(ll.lat, ll.lon) >= 1) {
+        const h = this.dem.heightAt(ll.lat, ll.lon);
+        if (h !== null) return h * this.exag;
+      }
+    }
     return this.chunk ? this.chunk.heightAt(x, z) : 0;
   }
   /** Limite para não sair da malha enquanto o próximo bloco carrega. */
@@ -465,6 +543,15 @@ export class TerrainWorld {
     const m = 500;
     p.x = Math.max(b.minX + m, Math.min(b.maxX - m, p.x));
     p.z = Math.max(b.minZ + m, Math.min(b.maxZ - m, p.z));
+    if (this.dem) {
+      // Exploração limitada à área com relevo real (a cratera)
+      const d = this.dem.bounds;
+      const nw = this.toWorld(d.latMax, d.lonMin);
+      const se = this.toWorld(d.latMin, d.lonMax);
+      const mm = 2000;
+      p.x = Math.max(nw.x + mm, Math.min(se.x - mm, p.x));
+      p.z = Math.max(nw.z + mm, Math.min(se.z - mm, p.z));
+    }
   }
 
   async init(onProgress) {
@@ -504,13 +591,14 @@ export class TerrainWorld {
         .finally(() => (this.loadingChunk = false));
     }
 
-    if (!isInJezero(lat, lon)) return;
+    const mosaic = hiriseMosaicAt(lat, lon);
+    if (!mosaic) return;
     for (const p of this.patches) {
       if (p.loading) continue;
       if (p.cur && Math.hypot(pos.x - p.cur.cx, pos.z - p.cur.cz) < p.recenterDist) continue;
       if (p.failedAt && Math.hypot(pos.x - p.failedAt.x, pos.z - p.failedAt.z) < p.recenterDist) continue;
       p.loading = true;
-      buildHirisePatch(this, lat, lon, p.zoom, p.grid)
+      buildHirisePatch(this, lat, lon, p.zoom, p.grid, mosaic)
         .then((r) => {
           if (!r) {
             p.failedAt = { x: pos.x, z: pos.z };
