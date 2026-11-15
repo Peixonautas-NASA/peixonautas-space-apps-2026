@@ -17,7 +17,7 @@
   const areaRectangle = L.rectangle(bounds, { color: '#ffb454', weight: 2, dashArray: '6 6', fillOpacity: 0.025, interactive: false }).addTo(map);
   const markers = {};
   const endpoints = {};
-  let selecting = null, routeLine = null, worker = null, requestId = 0, lastResult = null, controller = null, editor = null;
+  let selecting = null, routeLine = null, worker = null, requestId = 0, lastResult = null, controller = null, editor = null, environmentEditor = null;
   const automatic = () => element('terrainMode').value === 'auto';
 
   function clearResult() {
@@ -116,15 +116,16 @@
     for (const id of controls) {
       if (!element(id).checkValidity() || element(id).value.trim() === '') throw new Error('Revise os pesos e o limite de inclinação.');
     }
-    return { distance: Number(element('weightDistance').value), slope: Number(element('weightSlope').value),
+    return { ...environmentEditor.getSnapshot().weights, distance: Number(element('weightDistance').value), slope: Number(element('weightSlope').value),
       ascent: Number(element('weightAscent').value), terrain: Number(element('weightTerrain').value), maxSlopeDeg: Number(element('routeMaxSlope').value) };
   }
 
   function showResult(result) {
     const messages = {
+      'environment-data-missing': 'Faltam dados ambientais em A ou B. Importe uma grade que cubra os pontos, escolha um cenário ou zere o peso correspondente.',
       'outside-area': 'Um dos pontos está fora do terreno carregado.',
       'invalid-endpoint': 'Um dos pontos está bloqueado pela política manual, não tem suporte de elevação ou excede o limite de inclinação.',
-      'no-path': 'Nenhuma rota encontrada dentro deste recorte com o limite escolhido. Isso não exclui desvios fora da área.'
+      'no-path': 'Nenhuma rota encontrada neste recorte com os limites, bloqueios e cobertura ambiental escolhidos. Áreas sem dados ambientais ativos impedem passagem. Isso não exclui desvios fora da área.'
     };
     if (result.status !== 'ok') { status(messages[result.status] || 'Não foi possível calcular a rota.'); return; }
     const points = result.cells.map(cell => {
@@ -140,11 +141,23 @@
       + ' | Inclinação máxima estimada: ' + format(result.maxSlopeDeg) + '°'
       + ' | Custo ponderado: ' + format(result.cost)
       + ' (distância ' + format(result.costParts.distance) + ', inclinação ' + format(result.costParts.slope)
-      + ', subida ' + format(result.costParts.ascent) + ', transitabilidade ' + format(result.costParts.terrain || 0) + ').'
+      + ', subida ' + format(result.costParts.ascent) + ', transitabilidade ' + format(result.costParts.terrain || 0)
+      + ', radiação ' + format(result.costParts.radiation || 0) + ', temperatura ' + format(result.costParts.temperature || 0)
+      + ', magnetismo ' + format(result.costParts.magnetism || 0) + ').'
       + (result.traversability?.enabled ? ' Camada manual ativa: ' + format(result.traversability.classDistanceM.difficult / 1000)
         + ' km difíceis; ' + format(result.traversability.classDistanceM.unknown / 1000) + ' km desconhecidos.' : ' Camada manual desligada.');
+    if (result.environment?.enabled) {
+      const e = result.environment;
+      element('routeMetrics').textContent += ' Ambiente: tempo estimado ' + format(e.durationHours) + ' h (velocidade constante)'
+        + (e.doseUSv !== null ? '; dose estimada no modelo/cenário ' + format(e.doseUSv) + ' µSv' : '')
+        + (e.temperatureMinC !== null ? '; temperatura amostrada ' + format(e.temperatureMinC) + ' a ' + format(e.temperatureMaxC) + ' °C' : '')
+        + (e.magneticMaxNT !== null ? '; campo máximo amostrado ' + format(e.magneticMaxNT) + ' nT' : '')
+        + '. ' + Object.entries(e.layers).map(([key, layer]) => key + ': ' + layer.source.title
+          + (layer.effectiveResolutionM ? ' (resolução efetiva ≥ ' + format(layer.effectiveResolutionM) + ' m)' : ' (simulação uniforme)')).join('; ')
+        + '. Procedência importada declarada pelo usuário; campos estáticos, sem conversão de magnetismo em proteção radiológica.';
+    }
     status(result.cells.length === 1 ? 'A e B estão na mesma célula.' : 'Rota calculada no DTM. Grade de '
-      + Math.round(grid.pixelSizeM).toLocaleString('pt-BR') + ' m; custo comparativo, sem estimativa de tempo ou energia.'
+      + Math.round(grid.pixelSizeM).toLocaleString('pt-BR') + ' m; custo comparativo, sem estimativa de energia.'
       + (grid.pixelSizeM > 100 ? ' Rota regional: não resolve inclinações e obstáculos locais.' : ''));
     if (!map.getBounds().contains(endpoints.A.position) || !map.getBounds().contains(endpoints.B.position)) {
       map.fitBounds(bounds, { padding: [25, 25], animate: false });
@@ -223,7 +236,8 @@
         grid: { width: activeGrid.width, height: activeGrid.height, stepXM: activeGrid.stepXM,
           stepYM: activeGrid.stepYM, stepXMByRow: activeGrid.stepXMByRow, elevations,
           originX: activeGrid.originX, originY: activeGrid.originY, pixelSizeM: activeGrid.pixelSizeM,
-          projection: activeGrid.projection, annotations: manual.areas, traversability: manual.policy },
+          projection: activeGrid.projection, annotations: manual.areas, traversability: manual.policy,
+          environment: environmentEditor.getSnapshot().settings },
         start: endpoints.A.cell, goal: endpoints.B.cell, weights }, [elevations.buffer]);
     });
   }
@@ -233,6 +247,9 @@
     onDrawStart: () => { setSelection(null); clearResult(); status('Desenhando uma área manual. Conclua ou cancele antes de calcular.'); },
     onDrawEnd: () => status('Desenho cancelado. Escolha os pontos ou calcule novamente.')
   });
+
+  environmentEditor = globalThis.PeixonautasEnvironment.createEditor({ getGrid: () => grid,
+    onChange: () => { clearResult(); status('Pesos ou fontes ambientais alterados. Recalcule a rota.'); } });
 
   element('selectRouteA').onclick = () => setSelection('A');
   element('selectRouteB').onclick = () => setSelection('B');
@@ -283,6 +300,7 @@
         sourceUrl: grid.source.url, sourceTitle: grid.source.title || grid.name,
         terrainSelection: grid.selection || { mode: 'bundled-local' },
         manualTraversability: editor.getSnapshot(), traversability: lastResult.traversability,
+        environmentInput: environmentEditor.getSnapshot(), environment: lastResult.environment,
         coordinateSystem: 'Mars planetocentric latitude / east longitude, degrees',
         elevationReference: grid.source.terrainReference, weights: lastResult.weights,
         distanceM: lastResult.distanceM, ascentM: lastResult.ascentM, descentM: lastResult.descentM,

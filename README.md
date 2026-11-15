@@ -74,6 +74,8 @@ Peixonautas: adicione aqui os nomes e papéis.
 
 ## Dados e créditos
 
+O planejador aceita pesos de radiação, temperatura e magnetismo por grades numéricas importadas ou cenários explicitamente simulados. Veja [formato, cálculo e limitações](docs/environmental-weights.md). Os pesos começam em zero e não há busca automática de mapas ambientais observacionais.
+
 Liste aqui cada conjunto de dados NASA usado (nome, link, licença).
 
 ## Licença

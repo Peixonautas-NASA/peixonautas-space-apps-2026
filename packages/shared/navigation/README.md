@@ -161,3 +161,12 @@ drawing, hard/soft detours, weight zero, unknown blocking, reload persistence,
 atomic import/rejection, deletion, provenance and interaction with A/B selection.
 AI assistance record (2026-11-14): Codex assisted with the manual interpretation
 layer, conservative rasterization, cost integration, persistence and tests.
+
+Environmental criteria: optional `radiation`, `temperature`, and `magnetism` weights
+default to zero. `grid.environment` holds static imported geographic rasters or
+explicit uniform scenarios. Positive weights require a source; missing coverage
+blocks travel. See [schema, formulas and assumptions](../../../docs/environmental-weights.md).
+The route export includes inputs, declared provenance, per-criterion costs and
+constant-speed exposure estimates. No magnetic shielding or automatic sensor-map
+retrieval is assumed. Browser test: `node apps/map-2d/tests/environment.cjs` with
+an isolated CDP browser on port 9222; accepts an optional HTTP URL.

@@ -43,6 +43,10 @@
     #annotationList { padding: 0; list-style: none; }
     #annotationList li { border: 1px solid #414a56; border-radius: 6px; padding: 8px; margin-top: 8px; }
     #annotationList .annotation-title { display: block; margin-bottom: 4px; }
+    #environmentEditor { margin-top: 12px; border-top: 1px solid #30363d; padding-top: 10px; }
+    #environmentEditor fieldset { border: 1px solid #414a56; border-radius: 6px; margin: 12px 0; padding: 10px; min-width: 0; }
+    #environmentEditor legend { font-weight: 600; color: #8dc5ff; }
+    #environmentStatus, .environment-info { font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; margin-top: 8px; }
     .route-point { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; border: 2px solid white; color: white; font-weight: 700; box-shadow: 0 2px 6px #000; }
     .route-point-a { background: #16803c; }
     .route-point-b { background: #1f6feb; }
@@ -142,6 +146,39 @@
         <label>Importar áreas de Marte (substitui as atuais)
           <input id="importAnnotations" type="file" accept=".json,.geojson,application/json,application/geo+json" />
         </label>
+      </details>
+      <details id="environmentEditor">
+        <summary>Radiação, temperatura e magnetismo</summary>
+        <p class="subtitle">Critérios experimentais. Use grades numéricas de superfície com procedência declarada, ou cenários de simulação. Nenhuma medição atual é buscada automaticamente. Campo magnético não é convertido em proteção contra radiação.</p>
+        <label>Velocidade horizontal assumida (m/s)
+          <input id="environmentSpeed" type="number" min="0.001" max="1000" step="any" value="1" />
+        </label>
+        <label>Dose de referência para o custo (µSv; não é limite de saúde)
+          <input id="environmentDoseReference" type="number" min="0.001" step="any" value="100" />
+        </label>
+        <label>Faixa térmica de referência — mínimo (°C)
+          <input id="environmentTemperatureMin" type="number" min="-273.15" step="any" value="-80" />
+        </label>
+        <label>Faixa térmica de referência — máximo (°C)
+          <input id="environmentTemperatureMax" type="number" min="-273.15" step="any" value="-20" />
+        </label>
+        <label>Desvio térmico de referência (°C)
+          <input id="environmentTemperatureReference" type="number" min="0.001" step="any" value="20" />
+        </label>
+        <label>Penalizar magnitude magnética acima de (nT)
+          <input id="environmentMagneticLimit" type="number" min="0" step="any" value="1000" />
+        </label>
+        <label>Excesso magnético de referência (nT)
+          <input id="environmentMagneticReference" type="number" min="0.001" step="any" value="1000" />
+        </label>
+        <div id="environmentLayers"></div>
+        <div id="environmentStatus" role="status" aria-live="polite">Pesos ambientais desligados por padrão.</div>
+        <button id="resetEnvironment" type="button" class="preset-btn">Desligar os três pesos ambientais</button>
+        <button id="exportEnvironment" type="button" class="preset-btn">Exportar configuração e grades</button>
+        <label>Importar configuração ambiental (substitui a atual)
+          <input id="importEnvironment" type="file" accept=".json,application/json" />
+        </label>
+        <p class="subtitle">Grades importadas ficam apenas nesta sessão; exporte para preservá-las. Campos são estáticos e usam velocidade constante. Grades grosseiras não ganham precisão ao serem alinhadas ao DTM. Temperatura de superfície e do ar são grandezas distintas.</p>
       </details>
       <button id="calculateRoute" type="button">Calcular rota A → B</button>
       <button class="preset-btn" id="exportRoute" type="button" disabled>Exportar GeoJSON</button>
@@ -505,6 +542,7 @@
   <script src="../../packages/shared/navigation/planner.js"></script>
   <script src="../../data/gale/terrain.js"></script>
   <script src="traversability-editor.js"></script>
+  <script src="environment-editor.js"></script>
   <script src="route-planner.js"></script>
 </body>
 </html>

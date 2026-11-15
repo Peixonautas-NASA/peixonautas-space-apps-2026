@@ -7,6 +7,119 @@
   'use strict';
   const RAD = Math.PI / 180;
 
+  const ENVIRONMENT_FIELDS = {
+    radiation: { unit: 'uSv/h', quantities: ['radiationDoseEquivalentRate'], value: 26.7 },
+    temperature: { unit: 'degC', quantities: ['airTemperature', 'surfaceTemperature'], value: -60 },
+    magnetism: { unit: 'nT', quantities: ['magneticFieldMagnitude'], value: 200 }
+  };
+
+  function validateEnvironmentRaster(data, field) {
+    const spec = ENVIRONMENT_FIELDS[field];
+    if (!spec || !data || data.schemaVersion !== 1 || data.planet !== 'Mars'
+        || data.unit !== spec.unit || !spec.quantities.includes(data.quantity)
+        || !Number.isInteger(data.width) || !Number.isInteger(data.height) || data.width < 1 || data.height < 1
+        || data.width * data.height > 250000 || !Array.isArray(data.values) || data.values.length !== data.width * data.height) {
+      throw new Error('Grade ambiental inválida: verifique planeta, grandeza, unidade e dimensões.');
+    }
+    const b = data.bounds, s = data.source;
+    if (!b || ![b.latMin, b.latMax, b.lonMin, b.lonMax].every(Number.isFinite)
+        || b.latMin >= b.latMax || b.lonMin >= b.lonMax || b.latMin < -75 || b.latMax > 75 || b.lonMin < -180 || b.lonMax > 180
+        || !s || !['model', 'observation', 'scenario'].includes(s.kind) || s.reference !== 'surface'
+        || typeof s.title !== 'string' || !s.title.trim() || s.title.length > 160
+        || typeof s.temporalContext !== 'string' || !s.temporalContext.trim() || s.temporalContext.length > 200
+        || !Number.isFinite(s.resolutionM) || s.resolutionM <= 0
+        || typeof s.url !== 'string' || (s.url && !/^https?:\/\//i.test(s.url))) {
+      throw new Error('A grade precisa de cobertura e procedência declarada: fonte, data/período, resolução e referência de superfície.');
+    }
+    const values = data.values.map(value => {
+      if (value === null) return null;
+      if (!Number.isFinite(value) || Math.abs(value) > 1e12 || (field === 'temperature' ? value < -273.15 : value < 0)) {
+        throw new Error('Valor ambiental inválido. Use números na unidade declarada ou null para ausência de dados.');
+      }
+      return value;
+    });
+    return { schemaVersion: 1, planet: 'Mars', quantity: data.quantity, unit: data.unit,
+      width: data.width, height: data.height, bounds: { latMin: b.latMin, latMax: b.latMax, lonMin: b.lonMin, lonMax: b.lonMax }, values,
+      source: { kind: s.kind, reference: 'surface', title: s.title, url: s.url, resolutionM: s.resolutionM,
+        temporalContext: s.temporalContext, note: typeof s.note === 'string' ? s.note.slice(0, 500) : '' } };
+  }
+
+  function normalizeEnvironment(input = {}) {
+    const p = { speedMps: 1, doseReferenceUSv: 100, temperatureMinC: -80, temperatureMaxC: -20,
+      temperatureReferenceC: 20, magneticLimitNT: 1000, magneticReferenceNT: 1000, ...input };
+    if (![p.speedMps, p.doseReferenceUSv, p.temperatureReferenceC, p.magneticReferenceNT].every(v => Number.isFinite(v) && v >= 0.001)
+        || p.speedMps > 1000 || ![p.temperatureMinC, p.temperatureMaxC, p.magneticLimitNT].every(Number.isFinite)
+        || p.temperatureMinC < -273.15 || p.temperatureMaxC < p.temperatureMinC || p.magneticLimitNT < 0) {
+      throw new Error('Revise velocidade, referências ambientais e faixa de temperatura.');
+    }
+    const layers = {};
+    for (const [field, spec] of Object.entries(ENVIRONMENT_FIELDS)) {
+      const layer = input.layers?.[field] || {};
+      const mode = layer.mode || 'off', value = layer.value ?? spec.value;
+      if (!['off', 'uniform', 'raster'].includes(mode) || !Number.isFinite(value)
+          || (field === 'temperature' ? value < -273.15 : value < 0) || Math.abs(value) > 1e12) {
+        throw new Error('Fonte ou valor do cenário ambiental inválido.');
+      }
+      if (mode === 'raster' && !layer.raster) throw new Error('Importe a grade numérica para a camada ambiental selecionada.');
+      layers[field] = { mode, value, raster: layer.raster ? validateEnvironmentRaster(layer.raster, field) : null };
+    }
+    return { speedMps: p.speedMps, doseReferenceUSv: p.doseReferenceUSv,
+      temperatureMinC: p.temperatureMinC, temperatureMaxC: p.temperatureMaxC, temperatureReferenceC: p.temperatureReferenceC,
+      magneticLimitNT: p.magneticLimitNT, magneticReferenceNT: p.magneticReferenceNT, layers };
+  }
+
+  function sampleEnvironment(data, lat, lon) {
+    const b = data.bounds;
+    if (lat < b.latMin || lat > b.latMax || lon < b.lonMin || lon > b.lonMax) return NaN;
+    const x = Math.min(data.width - 1, Math.floor((lon - b.lonMin) / (b.lonMax - b.lonMin) * data.width));
+    const y = Math.min(data.height - 1, Math.floor((b.latMax - lat) / (b.latMax - b.latMin) * data.height));
+    const value = data.values[y * data.width + x];
+    return value === null ? NaN : value;
+  }
+
+  function prepareEnvironment(grid, input = {}, weights = {}) {
+    const active = Object.keys(ENVIRONMENT_FIELDS).filter(field => (weights[field] || 0) > 0);
+    if (!active.length) return null;
+    const config = normalizeEnvironment(input), n = grid.width * grid.height;
+    const missing = new Uint8Array(n), costPerM = new Float64Array(n), fields = {}, layers = {};
+    const secondsPerM = 1 / config.speedMps;
+    for (const field of active) {
+      const layer = config.layers[field], spec = ENVIRONMENT_FIELDS[field];
+      if (layer.mode === 'off') throw new Error('Ative uma fonte ou cenário para cada peso ambiental maior que zero.');
+      const values = new Float64Array(n), penalties = new Float64Array(n);
+      let validCells = 0;
+      if (layer.mode === 'raster' && !grid.projection) throw new Error('Grade de terreno sem projeção para alinhar os dados ambientais.');
+      for (let y = 0; y < grid.height; y++) for (let x = 0; x < grid.width; x++) {
+        const i = y * grid.width + x;
+        const location = layer.mode === 'raster' ? cellToLatLon(grid, { x, y }) : null;
+        const value = location ? sampleEnvironment(layer.raster, location.lat, location.lon) : layer.value;
+        values[i] = value;
+        if (!Number.isFinite(value)) { missing[i] = 1; continue; }
+        validCells++;
+        const normalized = field === 'radiation' ? value / config.doseReferenceUSv
+          : field === 'temperature' ? Math.max(0, config.temperatureMinC - value, value - config.temperatureMaxC) / config.temperatureReferenceC
+          : Math.max(0, value - config.magneticLimitNT) / config.magneticReferenceNT;
+        penalties[i] = 1000 * normalized * weights[field] * secondsPerM / 3600;
+        costPerM[i] += penalties[i];
+      }
+      const d = layer.mode === 'raster' ? layer.raster : null;
+      const effectiveResolutionM = d ? Math.max(d.source.resolutionM,
+        (d.bounds.latMax - d.bounds.latMin) * 3396190 * RAD / d.height,
+        (d.bounds.lonMax - d.bounds.lonMin) * 3396190 * RAD * Math.cos((d.bounds.latMax + d.bounds.latMin) / 2 * RAD) / d.width) : null;
+      layers[field] = { mode: layer.mode, unit: spec.unit, quantity: d?.quantity || spec.quantities[0],
+        source: d?.source || { kind: 'scenario', title: 'Cenário uniforme definido no aplicativo', temporalContext: 'Cenário estático, sem observação atual', reference: 'surface' },
+        uniformValue: layer.mode === 'uniform' ? layer.value : null, effectiveResolutionM,
+        sourceBounds: d?.bounds || null, validCells, missingCells: n - validCells,
+        provenance: layer.mode === 'raster' ? 'imported-source-declared-by-user' : 'scenario-not-observation' };
+      fields[field] = { values, penalties };
+    }
+    return { missing, costPerM, fields, config, info: { enabled: true, speedMps: config.speedMps,
+      assumptions: 'Static fields, constant horizontal speed; no magnetic-to-radiation conversion.',
+      references: { doseUSv: config.doseReferenceUSv, temperatureMinC: config.temperatureMinC,
+        temperatureMaxC: config.temperatureMaxC, temperatureC: config.temperatureReferenceC,
+        magneticLimitNT: config.magneticLimitNT, magneticNT: config.magneticReferenceNT }, layers } };
+  }
+
   function normalizeTraversability(policy = {}) {
     const p = { enabled: false, difficultCost: 3, unknownCost: 1, unknownPolicy: 'penalize', marginM: 60, ...policy };
     if (typeof p.enabled !== 'boolean' || !['allow', 'penalize', 'block'].includes(p.unknownPolicy)
@@ -201,11 +314,12 @@
   }
 
   function validateOptions(options = {}) {
-    const p = { distance: 1, slope: 3, ascent: 5, terrain: 1, maxSlopeDeg: 25, ...options };
+    const p = { distance: 1, slope: 3, ascent: 5, terrain: 1, radiation: 0, temperature: 0, magnetism: 0, maxSlopeDeg: 25, ...options };
     if (!Number.isFinite(p.distance) || p.distance <= 0
         || !Number.isFinite(p.slope) || p.slope < 0
         || !Number.isFinite(p.ascent) || p.ascent < 0
         || !Number.isFinite(p.terrain) || p.terrain < 0
+        || ![p.radiation, p.temperature, p.magnetism].every(v => Number.isFinite(v) && v >= 0 && v <= 1000000)
         || !Number.isFinite(p.maxSlopeDeg) || p.maxSlopeDeg <= 0 || p.maxSlopeDeg >= 90) {
       throw new Error('Pesos inválidos: distância > 0, demais pesos ≥ 0, limite entre 0° e 90°.');
     }
@@ -219,6 +333,7 @@
     const grid = prepareGrid(constraints ? { ...inputGrid, ...constraints } : inputGrid);
     const { width: w, height: h, elevations: e, slopes, stepXM, stepYM } = grid;
     const n = w * h;
+    const environment = prepareEnvironment(grid, inputGrid.environment, p);
     const rowStep = y => grid.stepXMByRow?.[y] ?? stepXM;
     let minStepX = stepXM;
     if (grid.stepXMByRow) for (const step of grid.stepXMByRow) minStepX = Math.min(minStepX, step);
@@ -226,8 +341,11 @@
       && cell.x >= 0 && cell.y >= 0 && cell.x < w && cell.y < h ? cell.y * w + cell.x : -1;
     const source = indexOf(start), target = indexOf(goal);
     if (source < 0 || target < 0) return { status: 'outside-area' };
+    if (environment && (environment.missing[source] || environment.missing[target])) {
+      return { status: 'environment-data-missing', environment: environment.info };
+    }
     const passable = i => Number.isFinite(e[i]) && Number.isFinite(slopes[i])
-      && slopes[i] <= p.maxSlopeDeg && (!grid.blocked || !grid.blocked[i]);
+      && slopes[i] <= p.maxSlopeDeg && (!grid.blocked || !grid.blocked[i]) && !environment?.missing[i];
     if (!passable(source) || !passable(target)) return { status: 'invalid-endpoint' };
     const costs = new Float64Array(n).fill(Infinity);
     const parent = new Int32Array(n).fill(-1);
@@ -249,10 +367,18 @@
         indices.reverse();
         let distanceM = 0, ascentM = 0, descentM = 0, maxSlopeDeg = 0;
         const cells = indices.map(k => ({ x: k % w, y: Math.floor(k / w), elevationM: e[k] }));
-        const parts = { distance: 0, slope: 0, ascent: 0, terrain: 0 };
+        const parts = { distance: 0, slope: 0, ascent: 0, terrain: 0, radiation: 0, temperature: 0, magnetism: 0 };
+        const environmentMetrics = { ...(environment?.info || { enabled: false }), durationHours: environment ? 0 : null,
+          doseUSv: environment?.fields.radiation ? 0 : null, temperatureMinC: null, temperatureMaxC: null, magneticMaxNT: null };
         const classDistanceM = { normal: 0, unknown: 0, difficult: 0 };
         for (let k = 0; k < indices.length; k++) {
           maxSlopeDeg = Math.max(maxSlopeDeg, slopes[indices[k]]);
+          if (environment?.fields.temperature) {
+            const value = environment.fields.temperature.values[indices[k]];
+            environmentMetrics.temperatureMinC = Math.min(environmentMetrics.temperatureMinC ?? Infinity, value);
+            environmentMetrics.temperatureMaxC = Math.max(environmentMetrics.temperatureMaxC ?? -Infinity, value);
+          }
+          if (environment?.fields.magnetism) environmentMetrics.magneticMaxNT = Math.max(environmentMetrics.magneticMaxNT ?? 0, environment.fields.magnetism.values[indices[k]]);
           if (!k) continue;
           const a = cells[k - 1], b = cells[k];
           const d = Math.hypot((b.x - a.x) * (rowStep(a.y) + rowStep(b.y)) / 2, (b.y - a.y) * stepYM);
@@ -266,12 +392,21 @@
           parts.slope += d * p.slope * (slope / 15) ** 2;
           parts.ascent += Math.max(0, dz) * p.ascent;
           parts.terrain += d * p.terrain * Math.max(grid.terrainCostPerM?.[indices[k - 1]] ?? 0, grid.terrainCostPerM?.[indices[k]] ?? 0);
+          if (environment) {
+            const hours = d / environment.config.speedMps / 3600;
+            environmentMetrics.durationHours += hours;
+            if (environment.fields.radiation) environmentMetrics.doseUSv += hours
+              * (environment.fields.radiation.values[indices[k - 1]] + environment.fields.radiation.values[indices[k]]) / 2;
+            for (const [field, values] of Object.entries(environment.fields)) {
+              parts[field] += d * (values.penalties[indices[k - 1]] + values.penalties[indices[k]]) / 2;
+            }
+          }
           const category = Math.max(grid.terrainClasses?.[indices[k - 1]] ?? 0, grid.terrainClasses?.[indices[k]] ?? 0);
           if (category) classDistanceM[['', 'normal', 'unknown', 'difficult'][category]] += d;
         }
         return { status: 'ok', cells, distanceM, ascentM, descentM, maxSlopeDeg,
           cost: costs[target], costParts: parts, expanded, weights: p,
-          traversability: { ...(grid.traversabilityInfo || { enabled: false }), classDistanceM } };
+          traversability: { ...(grid.traversabilityInfo || { enabled: false }), classDistanceM }, environment: environmentMetrics };
       }
       const x = i % w, y = Math.floor(i / w);
       for (let dy = -1; dy <= 1; dy++) {
@@ -289,7 +424,8 @@
           if (slope > p.maxSlopeDeg) continue;
           const next = costs[i] + d * (p.distance + p.slope * (slope / 15) ** 2)
             + Math.max(0, dz) * p.ascent
-            + d * p.terrain * Math.max(grid.terrainCostPerM?.[i] ?? 0, grid.terrainCostPerM?.[j] ?? 0);
+            + d * p.terrain * Math.max(grid.terrainCostPerM?.[i] ?? 0, grid.terrainCostPerM?.[j] ?? 0)
+            + d * ((environment?.costPerM[i] ?? 0) + (environment?.costPerM[j] ?? 0)) / 2;
           if (next >= costs[j]) continue;
           costs[j] = next;
           parent[j] = i;
@@ -297,7 +433,7 @@
         }
       }
     }
-    return { status: 'no-path', expanded };
+    return { status: 'no-path', expanded, environment: environment?.info || { enabled: false } };
   }
 
   function latLonToCell(grid, lat, lon) {
@@ -322,7 +458,8 @@
     return '(' + navigationFactory.toString() + ')();';
   }
   const api = { prepareGrid, planRoute, latLonToCell, cellToLatLon, createWorkerSource,
-    validateAnnotations, normalizeTraversability, rasterizeAnnotations };
+    validateAnnotations, normalizeTraversability, rasterizeAnnotations,
+    validateEnvironmentRaster, normalizeEnvironment, prepareEnvironment };
   if (typeof WorkerGlobalScope !== 'undefined' && globalThis instanceof WorkerGlobalScope) {
     globalThis.onmessage = event => {
       const { requestId, grid, start, goal, weights } = event.data;
