@@ -6,7 +6,7 @@
   const element = id => document.getElementById(id);
   const status = text => { element('routeStatus').textContent = text; };
   if (!api || !terrain) {
-    status('Dados de Gale indisponíveis. Mantenha as pastas data e packages junto às apps.');
+    status('Gale data unavailable. Keep the data and packages folders alongside apps.');
     element('calculateRoute').disabled = true;
     return;
   }
@@ -40,7 +40,7 @@
     element('selectRouteA').setAttribute('aria-pressed', String(selecting === 'A'));
     element('selectRouteB').setAttribute('aria-pressed', String(selecting === 'B'));
     map.getContainer().style.cursor = selecting ? 'crosshair' : '';
-    if (selecting) status((automatic() ? 'Clique no mapa' : 'Clique dentro da área delimitada') + ' para escolher ' + selecting + '.');
+    if (selecting) status((automatic() ? 'Click the map' : 'Click inside the outlined area') + ' to select ' + selecting + '.');
   }
 
   function setEndpoint(which, lat, lon) {
@@ -49,7 +49,7 @@
     const inGrid = cell.x >= 0 && cell.y >= 0 && cell.x < grid.width && cell.y < grid.height
       && Number.isFinite(grid.elevations[cell.y * grid.width + cell.x]);
     if (!validCoordinate || (!automatic() && !inGrid)) {
-      status('Escolha um ponto dentro da área de interesse com elevação válida.');
+      status('Choose a point within the area of interest with valid elevation.');
       if (markers[which]) markers[which].setLatLng(endpoints[which].position);
       return false;
     }
@@ -63,7 +63,7 @@
         draggable: true,
         icon: L.divIcon({ className: '', html: '<div class="route-point route-point-' + which.toLowerCase() + '">' + which + '</div>',
           iconSize: [28, 28], iconAnchor: [14, 14] }),
-        title: 'Ponto ' + which
+        title: 'Point ' + which
       }).addTo(map);
       markers[which].on('dragstart', () => { editor?.cancelDrawing(); clearResult(); });
       markers[which].on('dragend', event => {
@@ -72,7 +72,7 @@
       });
     }
     updateEndpointLabels();
-    status(automatic() ? 'Pontos escolhidos. Calcule para buscar o terreno.' : 'Pontos ajustados aos centros das células de 30 m. Pronto para calcular.');
+    status(automatic() ? 'Points selected. Calculate to fetch terrain.' : 'Points snapped to 30 m cell centers. Ready to calculate.');
     return true;
   }
 
@@ -101,12 +101,12 @@
       }
     }
     updateEndpointLabels();
-    const resolution = Math.round(grid.pixelSizeM).toLocaleString('pt-BR');
-    element('terrainSourceInfo').textContent = grid.name + ' · ' + resolution + ' m/célula'
-      + (data.cacheHit ? ' · área em cache' : '')
-      + (data.selection?.fallbackReasons?.length ? ' · fonte alternativa após indisponibilidade' : '');
+    const resolution = Math.round(grid.pixelSizeM).toLocaleString('en-US');
+    element('terrainSourceInfo').textContent = grid.name + ' · ' + resolution + ' m/cell'
+      + (data.cacheHit ? ' · cached area' : '')
+      + (data.selection?.fallbackReasons?.length ? ' · fallback source after unavailability' : '');
     element('terrainSourceLink').href = grid.source.doi ? 'https://doi.org/' + grid.source.doi : grid.source.url;
-    element('terrainSourceLink').textContent = 'Fonte: ' + (grid.source.title || grid.name);
+    element('terrainSourceLink').textContent = 'Source: ' + (grid.source.title || grid.name);
     element('terrainSourceLink').hidden = false;
   }
 
@@ -114,7 +114,7 @@
     editor.getSnapshot();
     const controls = ['weightDistance', 'weightSlope', 'weightAscent', 'weightTerrain', 'routeMaxSlope'];
     for (const id of controls) {
-      if (!element(id).checkValidity() || element(id).value.trim() === '') throw new Error('Revise os pesos e o limite de inclinação.');
+      if (!element(id).checkValidity() || element(id).value.trim() === '') throw new Error('Check the weights and slope limit.');
     }
     return { ...environmentEditor.getSnapshot().weights, distance: Number(element('weightDistance').value), slope: Number(element('weightSlope').value),
       ascent: Number(element('weightAscent').value), terrain: Number(element('weightTerrain').value), maxSlopeDeg: Number(element('routeMaxSlope').value) };
@@ -122,12 +122,12 @@
 
   function showResult(result) {
     const messages = {
-      'environment-data-missing': 'Faltam dados ambientais em A ou B. Importe uma grade que cubra os pontos, escolha um cenário ou zere o peso correspondente.',
-      'outside-area': 'Um dos pontos está fora do terreno carregado.',
-      'invalid-endpoint': 'Um dos pontos está bloqueado pela política manual, não tem suporte de elevação ou excede o limite de inclinação.',
-      'no-path': 'Nenhuma rota encontrada neste recorte com os limites, bloqueios e cobertura ambiental escolhidos. Áreas sem dados ambientais ativos impedem passagem. Isso não exclui desvios fora da área.'
+      'environment-data-missing': 'Environmental data is missing at A or B. Import a grid covering the points, choose a scenario, or set the corresponding weight to zero.',
+      'outside-area': 'One endpoint is outside the loaded terrain.',
+      'invalid-endpoint': 'One endpoint is blocked by the manual policy, lacks elevation support, or exceeds the slope limit.',
+      'no-path': 'No route found in this crop with the selected limits, blocks and environmental coverage. Missing active environmental data blocks passage. Detours outside this area may exist.'
     };
-    if (result.status !== 'ok') { status(messages[result.status] || 'Não foi possível calcular a rota.'); return; }
+    if (result.status !== 'ok') { status(messages[result.status] || 'Could not calculate the route.'); return; }
     const points = result.cells.map(cell => {
       const p = api.cellToLatLon(grid, cell);
       return [p.lat, p.lon];
@@ -135,30 +135,30 @@
     routeLine = L.polyline(points, { color: '#39e7ff', weight: 5, opacity: 0.95, smoothFactor: 0, interactive: false }).addTo(map);
     lastResult = result;
     element('exportRoute').disabled = false;
-    const format = value => value.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
-    element('routeMetrics').textContent = 'Distância horizontal: ' + format(result.distanceM / 1000) + ' km'
-      + ' | Subida: ' + format(result.ascentM) + ' m | Descida: ' + format(result.descentM) + ' m'
-      + ' | Inclinação máxima estimada: ' + format(result.maxSlopeDeg) + '°'
-      + ' | Custo ponderado: ' + format(result.cost)
-      + ' (distância ' + format(result.costParts.distance) + ', inclinação ' + format(result.costParts.slope)
-      + ', subida ' + format(result.costParts.ascent) + ', transitabilidade ' + format(result.costParts.terrain || 0)
-      + ', radiação ' + format(result.costParts.radiation || 0) + ', temperatura ' + format(result.costParts.temperature || 0)
-      + ', magnetismo ' + format(result.costParts.magnetism || 0) + ').'
-      + (result.traversability?.enabled ? ' Camada manual ativa: ' + format(result.traversability.classDistanceM.difficult / 1000)
-        + ' km difíceis; ' + format(result.traversability.classDistanceM.unknown / 1000) + ' km desconhecidos.' : ' Camada manual desligada.');
+    const format = value => value.toLocaleString('en-US', { maximumFractionDigits: 1 });
+    element('routeMetrics').textContent = 'Horizontal distance: ' + format(result.distanceM / 1000) + ' km'
+      + ' | Ascent: ' + format(result.ascentM) + ' m | Descent: ' + format(result.descentM) + ' m'
+      + ' | Estimated maximum slope: ' + format(result.maxSlopeDeg) + '°'
+      + ' | Weighted cost: ' + format(result.cost)
+      + ' (distance ' + format(result.costParts.distance) + ', slope ' + format(result.costParts.slope)
+      + ', ascent ' + format(result.costParts.ascent) + ', traversability ' + format(result.costParts.terrain || 0)
+      + ', radiation ' + format(result.costParts.radiation || 0) + ', temperature ' + format(result.costParts.temperature || 0)
+      + ', magnetism ' + format(result.costParts.magnetism || 0) + ').'
+      + (result.traversability?.enabled ? ' Manual layer enabled: ' + format(result.traversability.classDistanceM.difficult / 1000)
+        + ' km difficult; ' + format(result.traversability.classDistanceM.unknown / 1000) + ' km unknown.' : ' Manual layer off.');
     if (result.environment?.enabled) {
       const e = result.environment;
-      element('routeMetrics').textContent += ' Ambiente: tempo estimado ' + format(e.durationHours) + ' h (velocidade constante)'
-        + (e.doseUSv !== null ? '; dose estimada no modelo/cenário ' + format(e.doseUSv) + ' µSv' : '')
-        + (e.temperatureMinC !== null ? '; temperatura amostrada ' + format(e.temperatureMinC) + ' a ' + format(e.temperatureMaxC) + ' °C' : '')
-        + (e.magneticMaxNT !== null ? '; campo máximo amostrado ' + format(e.magneticMaxNT) + ' nT' : '')
+      element('routeMetrics').textContent += ' Environment: estimated time ' + format(e.durationHours) + ' h (constant speed)'
+        + (e.doseUSv !== null ? '; estimated model/scenario dose ' + format(e.doseUSv) + ' µSv' : '')
+        + (e.temperatureMinC !== null ? '; sampled temperature ' + format(e.temperatureMinC) + ' to ' + format(e.temperatureMaxC) + ' °C' : '')
+        + (e.magneticMaxNT !== null ? '; maximum sampled field ' + format(e.magneticMaxNT) + ' nT' : '')
         + '. ' + Object.entries(e.layers).map(([key, layer]) => key + ': ' + layer.source.title
-          + (layer.effectiveResolutionM ? ' (resolução efetiva ≥ ' + format(layer.effectiveResolutionM) + ' m)' : ' (simulação uniforme)')).join('; ')
-        + '. Procedência importada declarada pelo usuário; campos estáticos, sem conversão de magnetismo em proteção radiológica.';
+          + (layer.effectiveResolutionM ? ' (effective resolution ≥ ' + format(layer.effectiveResolutionM) + ' m)' : ' (uniform simulation)')).join('; ')
+        + '. Imported provenance declared by the user; static fields, no conversion of magnetism into radiation protection.';
     }
-    status(result.cells.length === 1 ? 'A e B estão na mesma célula.' : 'Rota calculada no DTM. Grade de '
-      + Math.round(grid.pixelSizeM).toLocaleString('pt-BR') + ' m; custo comparativo, sem estimativa de energia.'
-      + (grid.pixelSizeM > 100 ? ' Rota regional: não resolve inclinações e obstáculos locais.' : ''));
+    status(result.cells.length === 1 ? 'A and B are in the same cell.' : 'Route calculated on the DTM. Grid spacing: '
+      + Math.round(grid.pixelSizeM).toLocaleString('en-US') + ' m; comparative cost, no energy estimate.'
+      + (grid.pixelSizeM > 100 ? ' Regional route: does not resolve local slopes and obstacles.' : ''));
     if (!map.getBounds().contains(endpoints.A.position) || !map.getBounds().contains(endpoints.B.position)) {
       map.fitBounds(bounds, { padding: [25, 25], animate: false });
     }
@@ -166,13 +166,13 @@
 
   async function calculate() {
     clearResult();
-    if (!endpoints.A || !endpoints.B) { status('Escolha os pontos A e B.'); return; }
+    if (!endpoints.A || !endpoints.B) { status('Choose points A and B.'); return; }
     const currentRequest = requestId;
     try {
-      if (editor.isDrawing()) throw new Error('Conclua ou cancele o desenho da área antes de calcular.');
+      if (editor.isDrawing()) throw new Error('Finish or cancel drawing the area before calculating.');
       const weights = readWeights();
       if (automatic() && !/^https?:$/.test(location.protocol)) {
-        throw new Error('Para buscar terreno, inicie o serviço e abra http://127.0.0.1:7878/. Gale local continua disponível neste arquivo.');
+        throw new Error('To fetch terrain, start the service and open http://127.0.0.1:7878/. Local Gale is still available in this file.');
       }
       controller = new AbortController();
       const signal = controller.signal;
@@ -180,14 +180,14 @@
       const attempts = automatic() ? 3 : 1;
       for (let expansion = 0; expansion < attempts; expansion++) {
         if (automatic()) {
-          status(expansion ? 'Sem caminho no recorte anterior. Ampliando a busca de terreno...' : 'Buscando elevação para A e B. O primeiro acesso pode levar alguns minutos...');
+          status(expansion ? 'No path in the previous crop. Expanding the terrain search...' : 'Fetching elevation for A and B. The first request may take a few minutes...');
           const [latA, lonA] = endpoints.A.requestedPosition;
           const [latB, lonB] = endpoints.B.requestedPosition;
           const response = await fetch('/api/terrain', { method: 'POST', signal,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ start: { lat: latA, lon: lonA }, goal: { lat: latB, lon: lonB }, expansion }) });
           if (!response.ok) {
-            let message = 'Serviço de terreno indisponível. Abra a aplicação pelo serviço local.';
+            let message = 'Terrain service unavailable. Open the app through the local service.';
             try { message = (await response.json()).error || message; } catch { /* Non-service static host. */ }
             throw new Error(message);
           }
@@ -195,7 +195,7 @@
           if (requestId !== currentRequest) return;
           applyTerrain(data);
         }
-        status('Calculando A* na grade de ' + Math.round(grid.pixelSizeM).toLocaleString('pt-BR') + ' m...');
+        status('Calculating A* on a grid of ' + Math.round(grid.pixelSizeM).toLocaleString('en-US') + ' m...');
         const result = await search(grid, weights, signal, currentRequest);
         if (requestId !== currentRequest) return;
         if (result.status === 'no-path' && expansion + 1 < attempts) continue;
@@ -223,14 +223,14 @@
         if (worker === currentWorker) worker = null;
         if (error) reject(error); else resolve(result);
       };
-      const abort = () => finish(new DOMException('Cálculo cancelado.', 'AbortError'));
+      const abort = () => finish(new DOMException('Calculation canceled.', 'AbortError'));
       signal.addEventListener('abort', abort, { once: true });
       if (signal.aborted) { abort(); return; }
       currentWorker.onmessage = event => {
         if (event.data.requestId !== currentRequest) return;
         finish(event.data.error ? new Error(event.data.error) : null, event.data.result);
       };
-      currentWorker.onerror = () => finish(new Error('Falha no processamento da rota. Tente novamente.'));
+      currentWorker.onerror = () => finish(new Error('Route processing failed. Try again.'));
       const elevations = new Float32Array(activeGrid.elevations);
       currentWorker.postMessage({ requestId: currentRequest,
         grid: { width: activeGrid.width, height: activeGrid.height, stepXM: activeGrid.stepXM,
@@ -243,13 +243,13 @@
   }
 
   editor = globalThis.PeixonautasTraversability.createEditor({ map,
-    onChange: () => { clearResult(); status('Transitabilidade alterada. Recalcule a rota para aplicar as áreas e a política.'); },
-    onDrawStart: () => { setSelection(null); clearResult(); status('Desenhando uma área manual. Conclua ou cancele antes de calcular.'); },
-    onDrawEnd: () => status('Desenho cancelado. Escolha os pontos ou calcule novamente.')
+    onChange: () => { clearResult(); status('Traversability changed. Recalculate the route to apply the areas and policy.'); },
+    onDrawStart: () => { setSelection(null); clearResult(); status('Drawing a manual area. Finish or cancel before calculating.'); },
+    onDrawEnd: () => status('Drawing canceled. Choose points or calculate again.')
   });
 
   environmentEditor = globalThis.PeixonautasEnvironment.createEditor({ getGrid: () => grid,
-    onChange: () => { clearResult(); status('Pesos ou fontes ambientais alterados. Recalcule a rota.'); } });
+    onChange: () => { clearResult(); status('Environmental weights or sources changed. Recalculate the route.'); } });
 
   element('selectRouteA').onclick = () => setSelection('A');
   element('selectRouteB').onclick = () => setSelection('B');
@@ -259,17 +259,17 @@
     clearResult();
     if (automatic()) {
       element('terrainSourceLink').hidden = true;
-      element('terrainSourceInfo').textContent = 'A fonte e a resolução serão escolhidas para cobrir A e B.';
-      status('Escolha A/B em outra região ou insira coordenadas. Depois, calcule para buscar a elevação.');
+      element('terrainSourceInfo').textContent = 'Source and resolution will be selected to cover A and B.';
+      status('Choose A/B in another region or enter coordinates. Then calculate to fetch elevation.');
     } else {
       applyTerrain(localGrid);
-      status('Gale local selecionado. A e B devem estar dentro do recorte delimitado.');
+      status('Local Gale selected. A and B must be within the outlined crop.');
     }
   };
   element('applyRouteCoordinates').onclick = () => {
     const ids = ['routeLatA', 'routeLonA', 'routeLatB', 'routeLonB'];
     if (ids.some(id => !element(id).checkValidity() || element(id).value.trim() === '')) {
-      status('Revise as coordenadas: latitude -75° a 75°, longitude -180° a 180°.'); return;
+      status('Check coordinates: latitude -75° to 75°, longitude -180° to 180°.'); return;
     }
     const [latA, lonA, latB, lonB] = ids.map(id => Number(element(id).value));
     if (!automatic()) {
@@ -277,7 +277,7 @@
         const c = api.latLonToCell(grid, lat, lon);
         if (c.x < 0 || c.y < 0 || c.x >= grid.width || c.y >= grid.height
             || !Number.isFinite(grid.elevations[c.y * grid.width + c.x])) {
-          status('Esses pontos ficam fora de Gale local. Selecione o modo Automático para buscar outra região.'); return;
+          status('These points are outside local Gale. Select Automatic mode to fetch another region.'); return;
         }
       }
     }
@@ -286,7 +286,7 @@
     map.fitBounds([endpoints.A.position, endpoints.B.position], { padding: [50, 50], maxZoom: 11 });
   };
   for (const id of ['weightDistance', 'weightSlope', 'weightAscent', 'routeMaxSlope']) {
-    element(id).addEventListener('input', () => { clearResult(); status('Parâmetros alterados. Calcule a rota novamente.'); });
+    element(id).addEventListener('input', () => { clearResult(); status('Parameters changed. Calculate the route again.'); });
   }
   map.on('click', event => {
     if (!selecting) return;
@@ -326,7 +326,7 @@
   setEndpoint('B', -4.68, 137.42);
   document.getElementById('latInput').value = '-4.59';
   document.getElementById('lonInput').value = '137.44';
-  currentMarker.setLatLng([-4.59, 137.44]).setPopupContent('Gale — área de planejamento regional').closePopup();
+  currentMarker.setLatLng([-4.59, 137.44]).setPopupContent('Gale — regional planning area').closePopup();
   updateTelemetry(-4.59, 137.44);
   map.fitBounds(bounds, { padding: [25, 25], animate: false });
   async function initialize() {

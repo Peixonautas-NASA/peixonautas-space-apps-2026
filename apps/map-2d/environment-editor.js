@@ -2,9 +2,9 @@
 (function () {
   'use strict';
   const fields = {
-    radiation: { title: 'Radiação', suffix: 'Radiation', unit: 'µSv/h', quantity: 'radiationDoseEquivalentRate', fileUnit: 'uSv/h', value: 26.7, hot: 1000 },
-    temperature: { title: 'Temperatura', suffix: 'Temperature', unit: '°C', quantity: 'airTemperature', fileUnit: 'degC', value: -60, hot: -120 },
-    magnetism: { title: 'Magnetismo', suffix: 'Magnetism', unit: 'nT', quantity: 'magneticFieldMagnitude', fileUnit: 'nT', value: 200, hot: 5000 }
+    radiation: { title: 'Radiation', suffix: 'Radiation', unit: 'µSv/h', quantity: 'radiationDoseEquivalentRate', fileUnit: 'uSv/h', value: 26.7, hot: 1000 },
+    temperature: { title: 'Temperature', suffix: 'Temperature', unit: '°C', quantity: 'airTemperature', fileUnit: 'degC', value: -60, hot: -120 },
+    magnetism: { title: 'Magnetism', suffix: 'Magnetism', unit: 'nT', quantity: 'magneticFieldMagnitude', fileUnit: 'nT', value: 200, hot: 5000 }
   };
   const settingIds = { speedMps: 'environmentSpeed', doseReferenceUSv: 'environmentDoseReference',
     temperatureMinC: 'environmentTemperatureMin', temperatureMaxC: 'environmentTemperatureMax',
@@ -18,25 +18,25 @@
       const prefix = 'environment' + spec.suffix;
       // All interpolated strings below are static application constants.
       card.innerHTML = '<legend>' + spec.title + '</legend>'
-        + '<label>Peso <input id="' + prefix + 'Weight" type="number" min="0" max="100" step="any" value="0" /></label>'
-        + '<label>Fonte <select id="' + prefix + 'Mode"><option value="off">Desligado</option><option value="uniform">Cenário uniforme — simulação</option><option value="raster">Grade numérica importada</option></select></label>'
-        + '<label id="' + prefix + 'UniformRow" hidden>Valor constante do cenário (' + spec.unit + ')'
+        + '<label>Weight <input id="' + prefix + 'Weight" type="number" min="0" max="100" step="any" value="0" /></label>'
+        + '<label>Source <select id="' + prefix + 'Mode"><option value="off">Off</option><option value="uniform">Uniform scenario — simulation</option><option value="raster">Imported numerical grid</option></select></label>'
+        + '<label id="' + prefix + 'UniformRow" hidden>Constant scenario value (' + spec.unit + ')'
         + '<input id="' + prefix + 'Value" type="number" step="any" value="' + spec.value + '" /></label>'
-        + '<label>Importar grade JSON (' + spec.unit + ') <input id="' + prefix + 'File" type="file" accept=".json,application/json" /></label>'
+        + '<label>Import JSON grid (' + spec.unit + ') <input id="' + prefix + 'File" type="file" accept=".json,application/json" /></label>'
         + '<div class="environment-info" id="' + prefix + 'Info"></div>'
-        + '<button id="' + prefix + 'Demo" type="button" class="preset-btn">Usar exemplo SINTÉTICO</button>'
-        + '<button id="' + prefix + 'Remove" type="button" class="preset-btn" disabled>Remover grade da sessão</button>';
+        + '<button id="' + prefix + 'Demo" type="button" class="preset-btn">Use SYNTHETIC example</button>'
+        + '<button id="' + prefix + 'Remove" type="button" class="preset-btn" disabled>Remove grid from session</button>';
       el('environmentLayers').appendChild(card);
       el(prefix + 'Value').min = field === 'temperature' ? '-273.15' : '0';
       for (const suffix of ['Weight', 'Mode', 'Value']) el(prefix + suffix).addEventListener('input', changed);
       el(prefix + 'File').onchange = async event => {
         const file = event.target.files[0]; if (!file) return;
         try {
-          if (file.size > 20000000) throw new Error('Use arquivos de até 20 MB.');
+          if (file.size > 20000000) throw new Error('Use files up to 20 MB.');
           const validated = api.validateEnvironmentRaster(JSON.parse(await file.text()), field);
           rasters[field] = validated; el(prefix + 'Mode').value = 'raster';
-          changed(); message('Grade de ' + spec.title.toLowerCase() + ' importada. A procedência é declarada pelo arquivo, não verificada pelo aplicativo.');
-        } catch (error) { message('Importação recusada: ' + error.message); }
+          changed(); message('Grid for ' + spec.title.toLowerCase() + ' imported. Provenance is declared by the file, not verified by the app.');
+        } catch (error) { message('Import rejected: ' + error.message); }
         finally { event.target.value = ''; }
       };
       el(prefix + 'Demo').onclick = () => {
@@ -47,11 +47,11 @@
           width, height, bounds, values: Array.from({ length: 81 }, (_, i) => {
             const x = i % 9, y = Math.floor(i / 9);
             return x >= 3 && x <= 5 && y >= 3 && y <= 5 ? spec.hot : spec.value;
-          }), source: { title: 'EXEMPLO SINTÉTICO — ' + spec.title, kind: 'scenario', url: '', reference: 'surface',
-            resolutionM, temporalContext: 'Cenário artificial estático; não é observação de Marte.',
-            note: 'Valores criados apenas para testar o efeito dos pesos. A região central é artificial.' } }, field);
+          }), source: { title: 'SYNTHETIC EXAMPLE — ' + spec.title, kind: 'scenario', url: '', reference: 'surface',
+            resolutionM, temporalContext: 'Static artificial scenario; not an observation of Mars.',
+            note: 'Values created only to test the effect of weights. The central region is artificial.' } }, field);
         el(prefix + 'Mode').value = 'raster'; changed();
-        message('Exemplo SINTÉTICO carregado. Defina um peso maior que zero para testar; não representa medições de Marte.');
+        message('SYNTHETIC example loaded. Set a positive weight to test; this does not represent Mars measurements.');
       };
       el(prefix + 'Remove').onclick = () => {
         delete rasters[field]; el(prefix + 'Mode').value = 'off'; el(prefix + 'Weight').value = '0'; changed();
@@ -61,18 +61,18 @@
     function getSnapshot() {
       const settings = {}, weights = {};
       for (const [key, id] of Object.entries(settingIds)) {
-        if (!el(id).checkValidity() || el(id).value.trim() === '') throw new Error('Revise os parâmetros ambientais.');
+        if (!el(id).checkValidity() || el(id).value.trim() === '') throw new Error('Check environmental parameters.');
         settings[key] = Number(el(id).value);
       }
       settings.layers = {};
       for (const [field, spec] of Object.entries(fields)) {
         const prefix = 'environment' + spec.suffix;
         for (const suffix of ['Weight', 'Value']) if (!el(prefix + suffix).checkValidity() || el(prefix + suffix).value.trim() === '') {
-          throw new Error('Revise peso e valor de ' + spec.title.toLowerCase() + '.');
+          throw new Error('Check weight and value for ' + spec.title.toLowerCase() + '.');
         }
         weights[field] = Number(el(prefix + 'Weight').value);
         settings.layers[field] = { mode: el(prefix + 'Mode').value, value: Number(el(prefix + 'Value').value), raster: rasters[field] || null };
-        if (weights[field] > 0 && settings.layers[field].mode === 'off') throw new Error('Escolha cenário ou grade para ' + spec.title.toLowerCase() + ', ou deixe seu peso em zero.');
+        if (weights[field] > 0 && settings.layers[field].mode === 'off') throw new Error('Choose a scenario or grid for ' + spec.title.toLowerCase() + ', or leave its weight at zero.');
       }
       return { settings: api.normalizeEnvironment(settings), weights };
     }
@@ -81,19 +81,19 @@
         const prefix = 'environment' + spec.suffix, mode = el(prefix + 'Mode').value, data = rasters[field];
         el(prefix + 'UniformRow').hidden = mode !== 'uniform';
         el(prefix + 'Remove').disabled = !data;
-        let text = mode === 'off' ? 'Desligado.' : mode === 'uniform'
-          ? 'CENÁRIO: valor uniforme, sem variação espacial. Não é medição atual nem mapa local.'
-          : data ? (data.source.kind === 'scenario' ? 'CENÁRIO SINTÉTICO: ' : 'PROCEDÊNCIA DECLARADA PELO ARQUIVO: ')
-            + data.source.title + ' · ' + data.width + ' × ' + data.height + ' · resolução declarada '
-            + Math.round(data.source.resolutionM).toLocaleString('pt-BR') + ' m · ' + data.quantity + ' · ' + data.source.temporalContext
-          : 'Nenhuma grade importada. Importe JSON com valores físicos e procedência.';
-        if (Number(el(prefix + 'Weight').value) === 0) text += ' Peso zero: não influencia a rota.';
+        let text = mode === 'off' ? 'Off.' : mode === 'uniform'
+          ? 'SCENARIO: uniform value with no spatial variation. Not a current measurement or local map.'
+          : data ? (data.source.kind === 'scenario' ? 'SYNTHETIC SCENARIO: ' : 'PROVENANCE DECLARED BY FILE: ')
+            + data.source.title + ' · ' + data.width + ' × ' + data.height + ' · declared resolution '
+            + Math.round(data.source.resolutionM).toLocaleString('en-US') + ' m · ' + data.quantity + ' · ' + data.source.temporalContext
+          : 'No grid imported. Import JSON with physical values and provenance.';
+        if (Number(el(prefix + 'Weight').value) === 0) text += ' Zero weight: does not influence the route.';
         el(prefix + 'Info').textContent = text;
       }
     }
     function changed() {
       renderInfo(); onChange();
-      try { getSnapshot(); message('Configuração ambiental alterada. Recalcule a rota.'); }
+      try { getSnapshot(); message('Environmental configuration changed. Recalculate the route.'); }
       catch (error) { message(error.message); }
     }
     for (const id of Object.values(settingIds)) el(id).addEventListener('input', changed);
@@ -112,13 +112,13 @@
     el('importEnvironment').onchange = async event => {
       const file = event.target.files[0]; if (!file) return;
       try {
-        if (file.size > 20000000) throw new Error('Use arquivos de até 20 MB.');
+        if (file.size > 20000000) throw new Error('Use files up to 20 MB.');
         const data = JSON.parse(await file.text());
-        if (data.schemaVersion !== 1 || data.type !== 'mars-environment-config' || data.planet !== 'Mars') throw new Error('Configuração ambiental de Marte inválida.');
+        if (data.schemaVersion !== 1 || data.type !== 'mars-environment-config' || data.planet !== 'Mars') throw new Error('Invalid Mars environmental configuration.');
         const settings = api.normalizeEnvironment(data.settings);
         for (const field of Object.keys(fields)) {
           if (!Number.isFinite(data.weights?.[field]) || data.weights[field] < 0 || data.weights[field] > 100
-              || (data.weights[field] > 0 && settings.layers[field].mode === 'off')) throw new Error('Pesos e fontes ambientais incompatíveis.');
+              || (data.weights[field] > 0 && settings.layers[field].mode === 'off')) throw new Error('Incompatible environmental weights and sources.');
         }
         for (const [key, id] of Object.entries(settingIds)) el(id).value = settings[key];
         for (const [field, spec] of Object.entries(fields)) {
@@ -127,8 +127,8 @@
           el(prefix + 'Mode').value = settings.layers[field].mode; el(prefix + 'Value').value = settings.layers[field].value;
           el(prefix + 'Weight').value = data.weights[field];
         }
-        changed(); message('Configuração e grades importadas. Recalcule a rota.');
-      } catch (error) { message('Importação recusada: ' + error.message); }
+        changed(); message('Configuration and grids imported. Recalculate the route.');
+      } catch (error) { message('Import rejected: ' + error.message); }
       finally { event.target.value = ''; }
     };
     renderInfo();

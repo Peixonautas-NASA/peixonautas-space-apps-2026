@@ -159,13 +159,13 @@ async function init() {
   ui.loadingPlace.textContent = place.name;
   if (place.dem === 'gale') {
     // Relevo REAL: DEM HiRISE (2 m / 8 m) + DEM HRSC/MOLA (200 m), gerados por tools/build_gale_dem.py
-    ui.loadingText.textContent = 'Baixando relevo real da cratera (DEM HiRISE + HRSC/MOLA)…';
+    ui.loadingText.textContent = 'Downloading crater terrain data (HiRISE + HRSC/MOLA DEM)…';
     world.dem = await GaleDem.load();
     // textura procedural desligada: aqui todo o detalhe do chão é dado real
     ui.detailToggle.checked = false;
     world.setDetail(false);
   }
-  await world.init((d, t) => (ui.loadingText.textContent = `Baixando tiles NASA Trek… ${d}/${t}`));
+  await world.init((d, t) => (ui.loadingText.textContent = `Downloading NASA Trek tiles… ${d}/${t}`));
   // Rota: a do local (lat/lon) ou uma de exemplo saindo do ponto mais plano por perto
   let points;
   let destName;
@@ -178,7 +178,7 @@ async function init() {
     const spot = place.exactStart ? { x: 0, z: 0 } : world.findFlatSpot(0, 0);
     camera.position.set(spot.x, 0, spot.z);
     points = exampleRouteFrom(spot.x, spot.z, world.yawFlattest(spot.x, spot.z));
-    destName = 'Destino de exemplo';
+    destName = 'Example destination';
   }
   if (world.dem) {
     detail = new DetailTerrain(world, scene);
@@ -206,7 +206,7 @@ async function init() {
 
 init().catch((err) => {
   console.error(err);
-  ui.loadingText.textContent = `Erro ao carregar terreno: ${err.message}`;
+  ui.loadingText.textContent = `Error loading terrain: ${err.message}`;
 });
 
 // ---------- Plataforma: tela cheia, app instalado, orientação ----------
@@ -252,7 +252,7 @@ ui.fullscreenBtn.addEventListener('click', async () => {
     if (isFullscreen()) await exitFullscreen();
     else await enterFullscreen();
   } catch (err) {
-    toast(`Tela cheia falhou: ${err.message}`);
+    toast(`Fullscreen failed: ${err.message}`);
   }
 });
 ui.installClose.addEventListener('click', () => (ui.installSheet.hidden = true));
@@ -274,7 +274,7 @@ ui.sensorsBtn.addEventListener('click', () => {
   if (look.sensorsActive) {
     look.disableSensors();
     ui.sensorsBtn.classList.remove('on');
-    toast('Sensores desligados: arraste a tela para olhar.', 2500);
+    toast('Sensors off: drag the screen to look around.', 2500);
   } else turnSensorsOn();
 });
 
@@ -284,12 +284,12 @@ function showStart() {
   ui.startPlace.textContent = place.name;
   if (!canFullscreen) {
     ui.startPlain.hidden = true;
-    if (isInstalledApp) ui.startNote.textContent = 'Liga os sensores de movimento. Segure o celular na horizontal.';
-    else if (isIOS) ui.startNote.textContent = 'No iPhone, a tela cheia vem ao instalar como app (o botão de tela cheia explica como).';
-    else ui.startNote.textContent = 'Liga os sensores de movimento.';
+    if (isInstalledApp) ui.startNote.textContent = 'Enables motion sensors. Hold your phone in landscape.';
+    else if (isIOS) ui.startNote.textContent = 'On iPhone, install as an app for fullscreen (the fullscreen button explains how).';
+    else ui.startNote.textContent = 'Enables motion sensors.';
   }
   if (!isTouch) {
-    ui.startNote.textContent = 'No computador: arraste para olhar, W/A/S/D para andar livre e espaço para seguir a rota sozinho.';
+    ui.startNote.textContent = 'On desktop: drag to look around, use W/A/S/D to move freely, and press Space to follow the route automatically.';
     ui.startPlain.hidden = true;
   }
   ui.start.hidden = false;
@@ -302,7 +302,7 @@ function begin({ fullscreen }) {
   if (isTouch || isIOS) turnSensorsOn();
   if (fullscreen && canFullscreen && isTouch) enterFullscreen().catch(() => {});
   updateRotateOverlay();
-  setTimeout(() => toast('Segure Andar para caminhar para onde você olha. O play segue a rota sozinho.', 4500), 600);
+  setTimeout(() => toast('Hold Walk to move in the direction you are looking. Play follows the route automatically.', 4500), 600);
 }
 ui.startBtn.addEventListener('click', () => begin({ fullscreen: true }));
 ui.startPlain.addEventListener('click', () => begin({ fullscreen: false }));
@@ -329,23 +329,23 @@ function renderPlay() {
   if (ui.playBtn.dataset.state === state) return;
   ui.playBtn.dataset.state = state;
   ui.playBtn.innerHTML = state === 'restart' ? ICON_RESTART : state === 'pause' ? ICON_PAUSE : ICON_PLAY;
-  const label = state === 'restart' ? 'Recomeçar a rota' : state === 'pause' ? 'Pausar caminhada' : 'Continuar caminhada';
+  const label = state === 'restart' ? 'Restart route' : state === 'pause' ? 'Pause walking' : 'Resume walking';
   ui.playBtn.title = label;
   ui.playBtn.setAttribute('aria-label', label);
 }
 function togglePlay() {
   if (walker.finished) {
     walker.restart();
-    toast('Recomeçando a rota.', 1800);
+    toast('Restarting route.', 1800);
   } else {
     walker.auto = !walker.auto;
-    toast(walker.auto ? 'Caminhando pela rota.' : 'Caminhada pausada.', 1500);
+    toast(walker.auto ? 'Walking along route.' : 'Walking paused.', 1500);
   }
   renderPlay();
 }
 ui.playBtn.addEventListener('click', togglePlay);
 walker.onArrive = () => {
-  toast('Destino alcançado.', 4000);
+  toast('Destination reached.', 4000);
   renderPlay();
 };
 window.addEventListener('keydown', (e) => {
@@ -358,13 +358,13 @@ renderPlay();
 
 function renderSpeed() {
   const s = walker.speed;
-  ui.speedBtn.textContent = `${s.v.toLocaleString('pt-BR')} m/s`;
-  ui.speedBtn.title = `Velocidade: ${s.label}`;
+  ui.speedBtn.textContent = `${s.v.toLocaleString('en-US')} m/s`;
+  ui.speedBtn.title = `Speed: ${s.label}`;
 }
 ui.speedBtn.addEventListener('click', () => {
   walker.cycleSpeed();
   renderSpeed();
-  toast(`Velocidade: ${walker.speed.label} (${walker.speed.v.toLocaleString('pt-BR')} m/s)`, 1800);
+  toast(`Speed: ${walker.speed.label} (${walker.speed.v.toLocaleString('en-US')} m/s)`, 1800);
 });
 renderSpeed();
 
@@ -396,8 +396,8 @@ async function setStereo(on) {
     } catch {
       /* segue sem tela cheia */
     }
-    toast('Estéreo: segure a tela (ou o botão do Cardboard) para andar.');
-    if (!look.sensorsActive) setTimeout(() => toast('Dica: ative os sensores antes do modo estéreo.'), 3600);
+    toast('Stereo: hold the screen (or the Cardboard button) to walk.');
+    if (!look.sensorsActive) setTimeout(() => toast('Tip: enable sensors before stereo mode.'), 3600);
   }
   onResize();
 }
@@ -426,7 +426,7 @@ ui.placeSelect.addEventListener('change', () => {
 
 function applyExag(k) {
   ui.exagSlider.value = k;
-  ui.exagVal.textContent = k === 1 ? '1.0x (real 1:1)' : `${k.toFixed(1)}x`;
+  ui.exagVal.textContent = k === 1 ? '1.0x (true scale 1:1)' : `${k.toFixed(1)}x`;
   world.setExag(k);
   detail?.rebuild();
   route?.relayout();
@@ -463,32 +463,32 @@ onResize();
 // ---------- HUD ----------
 const fwd = new THREE.Vector3();
 const fmtDist = (m) => (Math.abs(m) >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${Math.round(m)} m`);
-const DIRS = ['N', 'NE', 'L', 'SE', 'S', 'SO', 'O', 'NO'];
+const DIRS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 function updateHud(ground, camYaw, hFov) {
   const heading = ((((-camYaw * 180) / Math.PI) % 360) + 360) % 360;
   ui.hudInfo.textContent =
     `${heading.toFixed(0).padStart(3, '0')}° ${DIRS[Math.round(heading / 45) % 8]} · ` +
-    `elev. ${ground >= 0 ? '+' : ''}${fmtDist(ground)} · andou ${fmtDist(walker.walked)}`;
+    `elev. ${ground >= 0 ? '+' : ''}${fmtDist(ground)} · traveled ${fmtDist(walker.walked)}`;
   const here = world.toLatLon(camera.position.x, camera.position.z);
   const demRes = world.dem?.resolutionAt(here.lat, here.lon);
   const relief = demRes
-    ? `DEM real ${demRes === 200 ? 'HRSC/MOLA 200 m' : `HiRISE ${demRes} m`}`
-    : 'MOLA cromaticidade 1:1';
+    ? `Terrain DEM ${demRes === 200 ? 'HRSC/MOLA 200 m' : `HiRISE ${demRes} m`}`
+    : 'MOLA chromaticity 1:1';
   ui.hudSource.textContent =
-    `Agora: ${relief} + ${world.hiriseActive ? 'HiRISE/CTX perto' : 'Viking'}` +
-    (world.loadingChunk ? ' · carregando terreno…' : '');
+    `Current: ${relief} + ${world.hiriseActive ? 'nearby HiRISE/CTX' : 'Viking'}` +
+    (world.loadingChunk ? ' · loading terrain…' : '');
   if (!route) return;
   const p = camera.position;
   const dist = Math.hypot(route.dest.x - p.x, route.dest.z - p.z);
   let rel = yawOfDirection(route.dest.x - p.x, route.dest.z - p.z) - camYaw;
   rel = Math.atan2(Math.sin(rel), Math.cos(rel));
   let hint;
-  if (walker.finished || dist < 6) hint = 'chegou';
-  else if (Math.abs(rel) < (hFov / 2) * 0.8) hint = 'à frente';
-  else if (rel > 0) hint = '← à esquerda';
-  else hint = 'à direita →';
-  const paused = walker.finished || walker.auto ? '' : ' · rota pausada';
-  ui.hudDest.textContent = `Destino ${fmtDist(dist)} · ${hint}${paused}`;
+  if (walker.finished || dist < 6) hint = 'arrived';
+  else if (Math.abs(rel) < (hFov / 2) * 0.8) hint = 'ahead';
+  else if (rel > 0) hint = '← left';
+  else hint = 'right →';
+  const paused = walker.finished || walker.auto ? '' : ' · route paused';
+  ui.hudDest.textContent = `Destination ${fmtDist(dist)} · ${hint}${paused}`;
 }
 
 // ---------- Loop ----------

@@ -12,16 +12,16 @@ export function requestArea(input) {
   for (const point of [start, goal]) {
     if (!point || !Number.isFinite(point.lat) || !Number.isFinite(point.lon)
         || Math.abs(point.lat) > LIMITS.maxLatitude || Math.abs(point.lon) > 180) {
-      throw new TerrainError('Use latitudes entre -75° e 75° e longitudes entre -180° e 180°.');
+      throw new TerrainError('Use latitudes between -75° and 75° and longitudes between -180° and 180°.');
     }
   }
-  if (Math.abs(start.lon - goal.lon) > 180) throw new TerrainError('Rotas que cruzam o antimeridiano ainda não são suportadas.');
+  if (Math.abs(start.lon - goal.lon) > 180) throw new TerrainError('Routes crossing the antimeridian are not yet supported.');
   const dlat = (goal.lat - start.lat) * RAD, dlon = (goal.lon - start.lon) * RAD;
   const hav = Math.sin(dlat / 2) ** 2 + Math.cos(start.lat * RAD) * Math.cos(goal.lat * RAD) * Math.sin(dlon / 2) ** 2;
   const distanceKm = 2 * 3396.19 * Math.asin(Math.min(1, Math.sqrt(hav)));
-  if (distanceKm > LIMITS.maxDistanceKm) throw new TerrainError('Divida o percurso em etapas de até 1.500 km.');
+  if (distanceKm > LIMITS.maxDistanceKm) throw new TerrainError('Split the itinerary into stages of up to 1,500 km.');
   const expansion = input.expansion ?? 0;
-  if (!Number.isInteger(expansion) || expansion < 0 || expansion > 2) throw new TerrainError('Tentativa de ampliação inválida.');
+  if (!Number.isInteger(expansion) || expansion < 0 || expansion > 2) throw new TerrainError('Invalid expansion attempt.');
   const marginKm = Math.min(200, Math.max(2, distanceKm * 0.15) * 2 ** expansion);
   const latitudePadding = marginKm / (3396.19 * RAD);
   const longitudePadding = latitudePadding / Math.cos(Math.max(Math.abs(start.lat), Math.abs(goal.lat)) * RAD);
@@ -53,7 +53,7 @@ export function selectSource(bounds, excluded = []) {
     const layout = gridLayout(source, bounds);
     if (layout.width * layout.height <= LIMITS.maxCells) return { source, layout };
   }
-  throw new TerrainError('Área grande demais para a grade disponível. Reduza o percurso ou a margem.');
+  throw new TerrainError('Area too large for the available grid. Reduce the route length or margin.');
 }
 
 export class TerrainService {
@@ -63,7 +63,7 @@ export class TerrainService {
     const key = createHash('sha256').update(JSON.stringify(bounds)).digest('hex');
     if (this.prepared.has(key)) return { ...this.prepared.get(key), cacheHit: true };
     if (this.pending.has(key)) return this.pending.get(key);
-    if (this.pending.size >= 2) throw new TerrainError('Preparando outras áreas. Aguarde e tente novamente.', 429);
+    if (this.pending.size >= 2) throw new TerrainError('Preparing other areas. Wait and try again.', 429);
     const task = this.prepare(bounds, key).finally(() => this.pending.delete(key));
     this.pending.set(key, task);
     return task;
@@ -74,7 +74,7 @@ export class TerrainService {
       let source, layout;
       try { ({ source, layout } = selectSource(bounds, excluded)); }
       catch (error) {
-        if (failures.length) throw new TerrainError('Não foi possível obter elevação nas fontes disponíveis. Tente novamente; Gale local continua disponível.', 502);
+        if (failures.length) throw new TerrainError('Could not retrieve elevation from the available sources. Try again; local Gale is still available.', 502);
         throw error;
       }
       excluded.push(source.id);
@@ -85,7 +85,7 @@ export class TerrainService {
         const lon = x => p.centralLonDeg + (layout.originX + x * pixel) / (p.radiusM * Math.cos(p.standardParallelDeg * RAD)) / RAD;
         const stepXMByRow = Array.from({ length: layout.height }, (_, y) => pixel * Math.cos(lat(y + 0.5) * RAD) / Math.cos(p.standardParallelDeg * RAD));
         const validCount = elevations.reduce((sum, value) => sum + Number(value !== null), 0);
-        if (!validCount) throw new Error('Sem células válidas neste produto.');
+        if (!validCount) throw new Error('No valid cells in this product.');
         const result = {
           id: `${source.id}:${key.slice(0, 16)}`, name: source.title,
           width: layout.width, height: layout.height, pixelSizeM: pixel,
@@ -103,10 +103,10 @@ export class TerrainService {
         this.prepared.set(key, result);
         return result;
       } catch (error) {
-        failures.push({ source: source.id, reason: error.message.includes('limite') ? error.message : 'Fonte indisponível ou formato não confirmado.' });
+        failures.push({ source: source.id, reason: error.message.includes('limit') ? error.message : 'Source unavailable or format not confirmed.' });
       }
     }
-    throw new TerrainError('Falha ao carregar os dados de elevação.', 502);
+    throw new TerrainError('Failed to load elevation data.', 502);
   }
 
   async readHrsc(layout) {
@@ -121,7 +121,7 @@ export class TerrainService {
         || k.ProjLinearUnitsGeoKey !== 9001 || k.ProjCenterLongGeoKey !== 0 || k.ProjCenterLatGeoKey !== 0
         || k.ProjStdParallel1GeoKey !== 0 || k.ProjFalseEastingGeoKey !== 0 || k.ProjFalseNorthingGeoKey !== 0
         || d.Compression !== 1 || d.RowsPerStrip !== 1 || d.SampleFormat[0] !== 3 || d.BitsPerSample[0] !== 32) {
-      throw new Error('Formato HRSC não confirmado.');
+      throw new Error('HRSC format not confirmed.');
     }
     const values = new Array(layout.width * layout.height).fill(null);
     const noData = image.getGDALNoData();
@@ -130,7 +130,7 @@ export class TerrainService {
       const last = Math.min(HRSC.height, band + 32) - 1;
       const start = d.StripOffsets[band], end = d.StripOffsets[last] + d.StripByteCounts[last] - 1;
       downloaded += end - start + 1;
-      if (downloaded > LIMITS.maxDownloadBytes) throw new Error('Recorte excede o limite de download.');
+      if (downloaded > LIMITS.maxDownloadBytes) throw new Error('Crop exceeds the download limit.');
       const bytes = await this.cache.get(HRSC.url, start, end);
       for (let y = Math.max(band, layout.y0); y < Math.min(band + 32, layout.y1); y++) {
         for (let x = layout.x0; x < layout.x1; x++) {
@@ -154,7 +154,7 @@ export class TerrainService {
         const west = ppd === 16 ? 0 : Math.floor(east / 90) * 90;
         const width = ppd === 16 ? 5760 : 11520, height = ppd === 16 ? 2880 : 5632;
         const row = Math.floor((top - lat) * ppd), col = Math.floor((east - west) * ppd);
-        if (row < 0 || row >= height || col < 0 || col >= width) throw new Error('Amostra MOLA fora do produto.');
+        if (row < 0 || row >= height || col < 0 || col >= width) throw new Error('MOLA sample outside the product.');
         const file = ppd === 16 ? 'megt90n000eb' : `megt${String(Math.abs(top)).padStart(2, '0')}${top < 0 ? 's' : 'n'}${String(west).padStart(3, '0')}hb`;
         const band = Math.floor(row / 64) * 64;
         const key = `${file}:${band}`;
@@ -163,7 +163,7 @@ export class TerrainService {
       }
     }
     const expectedBytes = [...groups.values()].reduce((sum, g) => sum + (Math.min(g.height, g.band + 64) - g.band) * g.width * 2, 0);
-    if (expectedBytes > LIMITS.maxDownloadBytes) throw new Error('Recorte excede o limite de download.');
+    if (expectedBytes > LIMITS.maxDownloadBytes) throw new Error('Crop exceeds the download limit.');
     const values = new Array(layout.width * layout.height).fill(null);
     for (const group of groups.values()) {
       const base = `${MOLA_BASE}/meg${String(ppd).padStart(3, '0')}/${group.file}`;

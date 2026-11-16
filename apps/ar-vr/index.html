@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en-US">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <!-- Tela cheia como app: Android (manifest) e iPhone (Adicionar à Tela de Início) -->
+  <!-- Fullscreen como app: Android (manifest) e iPhone (Adicionar à Tela de Início) -->
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" type="image/png" href="/icon-192.png" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-title" content="Peixonautas VR" />
+  <meta name="apple-mobile-web-app-title" content="Red Route VR" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="theme-color" content="#0d1117" />
-  <title>Peixonautas · Visão VR</title>
+  <title>Red Route · VR View</title>
   <style>
     :root {
       --sl: max(8px, env(safe-area-inset-left));
@@ -136,109 +136,110 @@
   <div id="app"></div>
 
   <div id="tools">
-    <button class="icon stroke" id="fullscreenBtn" title="Tela cheia" aria-label="Tela cheia">
+    <button class="icon stroke" id="fullscreenBtn" title="Fullscreen" aria-label="Fullscreen">
       <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
     </button>
-    <button class="icon stroke" id="sensorsBtn" title="Sensores de movimento" aria-label="Sensores">
+    <button class="icon stroke" id="sensorsBtn" title="Motion sensors" aria-label="Sensors">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="m15.5 8.5-2.3 4.7-4.7 2.3 2.3-4.7z" /></svg>
     </button>
-    <button class="icon stroke" id="stereoBtn" title="Modo estéreo (Cardboard)" aria-label="Estéreo">
+    <button class="icon stroke" id="stereoBtn" title="Stereo mode (Cardboard)" aria-label="Stereo">
       <svg viewBox="0 0 24 24"><path d="M3 7.5h18v9h-6l-1.6-2.6a1.6 1.6 0 0 0-2.8 0L9 16.5H3z" /><circle cx="7.5" cy="12" r="1.6" /><circle cx="16.5" cy="12" r="1.6" /></svg>
     </button>
-    <button class="icon stroke" id="settingsBtn" title="Ajustes" aria-label="Ajustes">
+    <button class="icon stroke" id="settingsBtn" title="Settings" aria-label="Settings">
       <svg viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9" /><circle cx="15" cy="7" r="2" /><circle cx="9" cy="17" r="2" /></svg>
     </button>
   </div>
 
   <div id="hud">
-    <div id="hudDest">Carregando rota…</div>
+    <div id="hudDest">Loading route…</div>
     <div id="hudInfo">—</div>
   </div>
 
   <div id="leftPad">
-    <button class="icon" id="playBtn" title="Pausar caminhada" aria-label="Pausar caminhada"></button>
-    <button id="speedBtn" title="Velocidade">1,4 m/s</button>
-    <button class="icon stroke" id="recenterBtn" title="Olhar para a rota" aria-label="Olhar para a rota">
+    <button class="icon" id="playBtn" title="Pause walking" aria-label="Pause walking"></button>
+    <button id="speedBtn" title="Speed">1.4 m/s</button>
+    <button class="icon stroke" id="recenterBtn" title="Look toward the route" aria-label="Look toward the route">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" /><circle cx="12" cy="12" r="2.5" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>
     </button>
   </div>
 
-  <button id="walkBtn" aria-label="Andar (segure)">
-    <svg viewBox="0 0 24 24" class="stroke"><path d="M12 19V5M6 11l6-6 6 6" /></svg>Andar
+  <button id="walkBtn" aria-label="Walk (hold)">
+    <svg viewBox="0 0 24 24" class="stroke"><path d="M12 19V5M6 11l6-6 6 6" /></svg>Walk
   </button>
 
   <div id="widgetBar" role="group" aria-label="Widgets">
-    <button id="map2dBtn" title="Mostrar ou esconder o Mapa 2D"><span class="dot"></span>Mapa 2D</button>
-    <button id="map3dBtn" title="Mostrar ou esconder o Mapa 3D"><span class="dot"></span>Mapa 3D</button>
+    <button id="map2dBtn" title="Show or hide the 2D Map"><span class="dot"></span>2D Map</button>
+    <button id="map3dBtn" title="Show or hide the 3D Map"><span class="dot"></span>3D Map</button>
   </div>
 
   <div id="settings">
-    <strong>Ajustes</strong>
-    <label>Local
+    <strong>Settings</strong>
+    <label>Location
       <select id="placeSelect"></select>
     </label>
-    <label>Escala vertical: <span id="exagVal">1.0x (real 1:1)</span>
+    <label>Vertical scale: <span id="exagVal">1.0x (true scale 1:1)</span>
       <input type="range" id="exagSlider" min="0.5" max="5" step="0.1" value="1" />
     </label>
-    <button id="exagReset" class="small">Voltar para escala real (1.0x)</button>
-    <label>Resposta dos sensores: <span id="smoothVal">10</span>
+    <button id="exagReset" class="small">Reset to true scale (1.0x)</button>
+    <label>Sensor response: <span id="smoothVal">10</span>
       <input type="range" id="smoothSlider" min="1" max="30" step="1" value="10" />
     </label>
-    <label class="check"><input type="checkbox" id="detailToggle" checked /> Textura de detalhe perto dos pés</label>
-    <p>Segure Andar para caminhar livre para onde você olha (inclusive subir montanhas). Isso pausa o piloto
-      automático; o play o retoma e ele volta a seguir a rota. Ao chegar, o play vira "recomeçar". O alvo vira o
-      olhar para a rota.</p>
-    <p>Mapas: arraste pela barra de título para mudar de lugar (eles ficam sempre à mesma distância de você). No Mapa 3D,
-      arraste a maquete para girar. O X fecha; o seletor no canto superior direito reabre à sua frente. Os mapas
-      acompanham você mesmo longe da rota.</p>
-    <p>Sensores: menor = mais suave (menos tremor, mais atraso). Com sensores ligados, arrastar a tela ajusta só o rumo.</p>
-    <p>PC: espaço pausa; W/A/S/D ou setas andam livre; Shift = 5x mais rápido.</p>
+    <label class="check"><input type="checkbox" id="detailToggle" checked /> Detail texture near your feet</label>
+    <p>Hold Walk to move freely in the direction you are looking, including uphill. This pauses autopilot.
+      Press Play to resume following the route. After arrival, Play restarts the route.
+      The target button points you toward the route.</p>
+    <p>Maps: drag the title bar to move a panel; it stays at a fixed distance from you. On the 3D Map,
+      drag the terrain model to rotate it. X closes the panel; the top-right selector reopens it in front of you.
+      Maps follow you even when you leave the route.</p>
+    <p>Sensors: lower values mean smoother motion, with less jitter and more delay. When sensors are enabled, dragging adjusts heading only.</p>
+    <p>Desktop: Space pauses; W/A/S/D or arrow keys move freely; Shift moves 5x faster.</p>
     <p id="hudSource">—</p>
-    <p>Relevo: mesmo do mapa 3D (cromaticidade do MOLA ClrShade, -8,2 a +21,2 km). A textura de detalhe é procedural.</p>
+    <p>Terrain: Gale uses prepared HiRISE and HRSC/MOLA DEMs where available. Other regions use MOLA ClrShade
+      chromaticity reconstruction (-8.2 to +21.2 km). The optional detail texture is procedural.</p>
   </div>
 
   <div id="crosshair"></div>
-  <button id="exitStereo">Sair do estéreo</button>
+  <button id="exitStereo">Exit stereo</button>
   <div id="toast"></div>
 
   <!-- Tela de entrada: um toque liga tela cheia + horizontal + sensores -->
   <div id="start" class="overlay" hidden>
-    <h1>Peixonautas · Visão VR</h1>
+    <h1>Red Route · VR View</h1>
     <p id="startPlace">—</p>
     <div id="rotateHint">
       <div class="rotateIcon stroke"><svg viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2" /><path d="M11 18.5h2" /></svg></div>
-      <p>Gire o celular para a <b>horizontal</b>.</p>
+      <p>Rotate your phone to <b>landscape</b>.</p>
     </div>
-    <button id="startBtn"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z" /></svg>Entrar</button>
-    <p class="muted" id="startNote">Entra em tela cheia, na horizontal, com os sensores de movimento.</p>
-    <button id="startPlain">continuar sem tela cheia</button>
+    <button id="startBtn"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z" /></svg>Enter</button>
+    <p class="muted" id="startNote">Enters fullscreen in landscape with motion sensors.</p>
+    <button id="startPlain">continue without fullscreen</button>
   </div>
 
   <!-- Celular em pé: pede para deitar -->
   <div id="rotateOverlay" class="overlay" hidden>
     <div class="rotateIcon stroke"><svg viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2" /><path d="M11 18.5h2" /></svg></div>
-    <h1>Deite o celular</h1>
-    <p>A Visão VR foi feita para usar na <b>horizontal</b>.</p>
-    <button id="rotateDismiss">usar na vertical mesmo assim</button>
+    <h1>Rotate your phone</h1>
+    <p>The VR view is designed for <b>landscape</b> use.</p>
+    <button id="rotateDismiss">continue in portrait anyway</button>
   </div>
 
   <!-- iPhone: Safari não tem tela cheia para páginas; como app instalado, tem -->
   <div id="installSheet" class="overlay" hidden>
-    <h1>Tela cheia no iPhone</h1>
-    <p>O Safari só abre em tela cheia quando a página está instalada como app:</p>
+    <h1>Fullscreen on iPhone</h1>
+    <p>Safari only opens fullscreen when the page is installed as an app:</p>
     <ol>
-      <li>Toque em <b>Compartilhar</b> (quadrado com seta para cima) na barra do Safari;</li>
-      <li>Escolha <b>Adicionar à Tela de Início</b> → <b>Adicionar</b>;</li>
-      <li>Abra pelo ícone <b>Peixonautas VR</b> e deite o celular.</li>
+      <li>Tap <b>Share</b> (square with an upward arrow) in the Safari toolbar;</li>
+      <li>Choose <b>Add to Home Screen</b> → <b>Add</b>;</li>
+      <li>Open the <b>Red Route VR</b> icon and rotate your phone to landscape.</li>
     </ol>
-    <p class="muted">Para isso funcionar, abra pelo link do túnel (https://…trycloudflare.com), que tem certificado válido.</p>
-    <button id="installClose">entendi</button>
+    <p class="muted">Open the tunnel link (https://…trycloudflare.com), which has a valid certificate.</p>
+    <button id="installClose">got it</button>
   </div>
 
   <div id="loading" class="overlay">
-    <h1>Peixonautas · Visão VR</h1>
+    <h1>Red Route · VR View</h1>
     <div id="loadingPlace">—</div>
-    <div id="loadingText" class="muted">Preparando terreno…</div>
+    <div id="loadingText" class="muted">Preparing terrain…</div>
   </div>
 
   <script type="module" src="/src/main.js"></script>

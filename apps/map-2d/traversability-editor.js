@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const STORAGE_KEY = 'peixonautas.mars.traversability.v1';
-  const names = { blocked: 'Bloqueada', difficult: 'Difícil', normal: 'Normal', unknown: 'Desconhecida' };
+  const names = { blocked: 'Blocked', difficult: 'Difficult', normal: 'Normal', unknown: 'Unknown' };
   const colors = { blocked: '#ff5b63', difficult: '#ff9c36', normal: '#3bd681', unknown: '#f4d35e' };
   function createEditor({ map, onChange, onDrawStart, onDrawEnd }) {
     const api = globalThis.PeixonautasNavigation;
@@ -15,20 +15,20 @@
     let restored = defaults;
     let restoredWeight = 1;
     const validWeight = value => {
-      if (!Number.isFinite(value) || value < 0 || value > 100) throw new Error('Peso da transitabilidade inválido.');
+      if (!Number.isFinite(value) || value < 0 || value > 100) throw new Error('Invalid traversability weight.');
       return value;
     };
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        if (stored.length > 1000000) throw new Error('Arquivo grande demais.');
+        if (stored.length > 1000000) throw new Error('File too large.');
         const data = JSON.parse(stored);
-        if (data.version !== 1 || data.planet !== 'Mars') throw new Error('Formato desconhecido.');
+        if (data.version !== 1 || data.planet !== 'Mars') throw new Error('Unknown format.');
         areas = api.validateAnnotations(data.areas);
         restored = api.normalizeTraversability(data.policy);
         restoredWeight = validWeight(data.terrainWeight ?? 1);
       }
-    } catch { areas = []; restored = defaults; initialMessage = 'Não foi possível restaurar as áreas salvas. Você pode importar uma exportação válida.'; }
+    } catch { areas = []; restored = defaults; initialMessage = 'Could not restore saved areas. You can import a valid export.'; }
     el('useTraversability').checked = restored.enabled;
     el('weightTerrain').value = restoredWeight;
     el('difficultCost').value = restored.difficultCost;
@@ -38,7 +38,7 @@
 
     function getSnapshot() {
       for (const id of ['difficultCost', 'unknownCost', 'blockedMargin', 'weightTerrain']) {
-        if (!el(id).checkValidity() || el(id).value.trim() === '') throw new Error('Revise os custos e a margem das áreas manuais.');
+        if (!el(id).checkValidity() || el(id).value.trim() === '') throw new Error('Check manual area costs and margin.');
       }
       return { areas: api.validateAnnotations(areas), terrainWeight: validWeight(Number(el('weightTerrain').value)), policy: api.normalizeTraversability({
         enabled: el('useTraversability').checked, difficultCost: Number(el('difficultCost').value),
@@ -51,8 +51,8 @@
       try {
         const snapshot = getSnapshot();
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, planet: 'Mars', ...snapshot })); }
-        catch { message('Não foi possível salvar no navegador. Exporte as áreas para preservá-las.'); return; }
-        message(text || 'Configuração salva neste navegador. Recalcule a rota.');
+        catch { message('Could not save in this browser. Export the areas to keep them.'); return; }
+        message(text || 'Configuration saved in this browser. Recalculate the route.');
       } catch (error) { message(error.message); }
     }
     function renderAreas() {
@@ -60,7 +60,7 @@
       el('annotationList').replaceChildren();
       for (const area of areas) {
         const label = document.createElement('span');
-        label.textContent = area.label + ' — ' + names[area.type] + ' (interpretação manual)';
+        label.textContent = area.label + ' — ' + names[area.type] + ' (manual interpretation)';
         const polygon = L.polygon(area.ring.map(([lon, lat]) => [lat, lon]), {
           color: colors[area.type], weight: 2, fillOpacity: 0.18, interactive: true
         }).bindTooltip(label).addTo(layer);
@@ -70,23 +70,23 @@
         title.className = 'annotation-title'; title.textContent = area.label;
         item.appendChild(title);
         const type = document.createElement('select');
-        type.setAttribute('aria-label', 'Classificação de ' + area.label);
+        type.setAttribute('aria-label', 'Classification of ' + area.label);
         for (const [value, text] of Object.entries(names)) {
           const option = document.createElement('option'); option.value = value; option.textContent = text;
           type.appendChild(option);
         }
         type.value = area.type;
-        type.onchange = () => { area.type = type.value; renderAreas(); changed('Classificação atualizada. Recalcule a rota.'); };
+        type.onchange = () => { area.type = type.value; renderAreas(); changed('Classification updated. Recalculate the route.'); };
         item.appendChild(type);
         const controls = document.createElement('div'); controls.className = 'route-controls';
-        const locate = document.createElement('button'); locate.type = 'button'; locate.className = 'preset-btn'; locate.textContent = 'Ver área';
+        const locate = document.createElement('button'); locate.type = 'button'; locate.className = 'preset-btn'; locate.textContent = 'View area';
         locate.onclick = () => map.fitBounds(polygon.getBounds(), { padding: [60, 60], maxZoom: 13 });
-        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'preset-btn'; remove.textContent = 'Remover';
+        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'preset-btn'; remove.textContent = 'Remove';
         remove.dataset.action = 'remove';
-        remove.onclick = () => { areas = areas.filter(a => a.id !== area.id); renderAreas(); changed('Área removida. Recalcule a rota.'); };
+        remove.onclick = () => { areas = areas.filter(a => a.id !== area.id); renderAreas(); changed('Area removed. Recalculate the route.'); };
         controls.append(locate, remove); item.appendChild(controls); el('annotationList').appendChild(item);
       }
-      if (!areas.length) message('Nenhuma área manual. Ao ativar a camada, o terreno sem classificação será desconhecido.');
+      if (!areas.length) message('No manual areas. When enabled, unclassified terrain will be unknown.');
     }
     function renderDraft() {
       draftLayer.clearLayers();
@@ -96,7 +96,7 @@
       for (const position of positions) L.circleMarker(position, { radius: 4, color: '#fff', interactive: false }).addTo(draftLayer);
       el('finishAnnotation').disabled = positions.length < 3;
       el('undoAnnotationVertex').disabled = !positions.length;
-      message(positions.length + ' vértices. Clique no mapa e use Concluir área; Esc cancela.');
+      message(positions.length + ' vertices. Click the map and select Finish area; Esc cancels.');
     }
     function cancelDrawing(notify = true) {
       if (!drawing) return;
@@ -105,11 +105,11 @@
       el('drawAnnotation').setAttribute('aria-pressed', 'false');
       for (const id of ['finishAnnotation', 'undoAnnotationVertex', 'cancelAnnotation']) el(id).disabled = true;
       map.getContainer().style.cursor = '';
-      if (notify) { message('Rascunho cancelado. Áreas existentes preservadas.'); onDrawEnd(); }
+      if (notify) { message('Draft canceled. Existing areas preserved.'); onDrawEnd(); }
     }
     el('drawAnnotation').onclick = () => {
       if (drawing) { cancelDrawing(); return; }
-      if (areas.length >= 50) { message('Limite de 50 áreas atingido. Remova uma antes de desenhar.'); return; }
+      if (areas.length >= 50) { message('Limit of 50 areas reached. Remove one before drawing.'); return; }
       onDrawStart();
       drawing = true; vertices = []; doubleClickEnabled = map.doubleClickZoom.enabled(); map.doubleClickZoom.disable();
       el('drawAnnotation').setAttribute('aria-pressed', 'true'); el('cancelAnnotation').disabled = false;
@@ -123,14 +123,14 @@
           type: el('annotationType').value, ring: vertices, createdAt: new Date().toISOString() };
         const validated = api.validateAnnotations([...areas, item]);
         cancelDrawing(false); areas = validated; renderAreas();
-        changed('Área manual salva. Ative a camada e recalcule para usá-la.');
+        changed('Manual area saved. Enable the layer and recalculate to use it.');
       } catch (error) { message(error.message); }
     };
     map.on('click', event => {
       if (!drawing) return;
       const { lat, lng } = event.latlng;
-      if (Math.abs(lat) > 75 || Math.abs(lng) > 180) { message('Desenhe entre latitudes ±75° e longitudes ±180°.'); return; }
-      if (vertices.length >= 128) { message('Limite de 128 vértices. Conclua ou desfaça um vértice.'); return; }
+      if (Math.abs(lat) > 75 || Math.abs(lng) > 180) { message('Draw between latitudes ±75° and longitudes ±180°.'); return; }
+      if (vertices.length >= 128) { message('Limit of 128 vertices. Finish or undo a vertex.'); return; }
       const previous = vertices.at(-1);
       if (previous && previous[0] === lng && previous[1] === lat) return;
       vertices.push([lng, lat]); renderDraft();
@@ -156,15 +156,15 @@
     el('importAnnotations').onchange = async event => {
       const file = event.target.files[0]; if (!file) return;
       try {
-        if (file.size > 1000000) throw new Error('Importe um arquivo de até 1 MB.');
+        if (file.size > 1000000) throw new Error('Import a file up to 1 MB.');
         const data = JSON.parse(await file.text());
         if (data.type !== 'FeatureCollection' || data.planet !== 'Mars' || data.schemaVersion !== 1 || !Array.isArray(data.features)) {
-          throw new Error('Use uma coleção de áreas de Marte exportada por este aplicativo.');
+          throw new Error('Use a Mars area collection exported by this app.');
         }
         const imported = api.validateAnnotations(data.features.map(feature => {
           if (feature?.type !== 'Feature' || feature.geometry?.type !== 'Polygon'
               || !Array.isArray(feature.geometry.coordinates) || feature.geometry.coordinates.length !== 1) {
-            throw new Error('Somente polígonos simples, sem furos.');
+            throw new Error('Only simple polygons without holes are supported.');
           }
           return { id: feature.id, label: feature.properties?.label, type: feature.properties?.type,
             ring: feature.geometry.coordinates[0], createdAt: feature.properties?.createdAt };
@@ -176,8 +176,8 @@
         el('unknownCost').value = policy.unknownCost; el('unknownPolicy').value = policy.unknownPolicy;
         el('blockedMargin').value = policy.marginM;
         el('weightTerrain').value = terrainWeight;
-        renderAreas(); changed('Áreas e política importadas, substituindo as anteriores. Recalcule a rota.');
-      } catch (error) { message('Importação recusada: ' + error.message); }
+        renderAreas(); changed('Areas and policy imported, replacing the previous ones. Recalculate the route.');
+      } catch (error) { message('Import rejected: ' + error.message); }
       finally { event.target.value = ''; }
     };
     renderAreas();

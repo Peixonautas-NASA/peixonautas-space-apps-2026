@@ -40,9 +40,9 @@ const fs = require('node:fs');
     await call('Emulation.setDeviceMetricsOverride', { width: 1500, height: 1000, deviceScaleFactor: 1, mobile: false });
     const url = process.argv[2] || pathToFileURL(path.resolve(__dirname, '../index.html')).href;
     await call('Page.navigate', { url });
-    await waitUntil('document.getElementById("routeStatus")?.textContent.includes("Rota calculada")');
+    await waitUntil('document.getElementById("routeStatus")?.textContent.includes("Route calculated")');
     const initialMetrics = await evaluate('document.getElementById("routeMetrics").textContent');
-    assert.ok(initialMetrics.includes('5,9 km'), initialMetrics);
+    assert.ok(initialMetrics.includes('5.9 km'), initialMetrics);
     assert.equal(await evaluate('document.getElementById("exportRoute").disabled'), false);
     assert.equal(await evaluate('map.getCenter().lat < -4 && map.getCenter().lng > 137'), true);
 
@@ -51,7 +51,7 @@ const fs = require('node:fs');
     assert.equal(await evaluate('document.getElementById("routeMetrics").textContent'), '');
     assert.equal(await evaluate('document.getElementById("exportRoute").disabled'), true);
     await evaluate('document.getElementById("calculateRoute").click()');
-    await waitUntil('document.getElementById("routeStatus").textContent.includes("Rota calculada")');
+    await waitUntil('document.getElementById("routeStatus").textContent.includes("Route calculated")');
     assert.notEqual(await evaluate('document.getElementById("routeMetrics").textContent'), initialMetrics);
 
     // Cancel an in-flight request with an edit; its reply must not restore the old path.
@@ -61,24 +61,24 @@ const fs = require('node:fs');
 
     // Invalid values produce actionable feedback and no stale export.
     await evaluate('document.getElementById("weightDistance").value="0";document.getElementById("calculateRoute").click()');
-    assert.ok((await evaluate('document.getElementById("routeStatus").textContent')).includes('Revise'));
+    assert.ok((await evaluate('document.getElementById("routeStatus").textContent')).includes('Check'));
     await evaluate('document.getElementById("weightDistance").value="1"');
 
     // Map selection snaps both endpoints to the same real cell and returns zero distance.
     await evaluate('document.getElementById("selectRouteB").click();map.fire("click",{latlng:L.latLng(-4.59,137.44)});document.getElementById("calculateRoute").click();');
-    await waitUntil('document.getElementById("routeStatus").textContent.includes("mesma célula")');
+    await waitUntil('document.getElementById("routeStatus").textContent.includes("same cell")');
     assert.ok((await evaluate('document.getElementById("routeMetrics").textContent')).includes('0 km'));
 
     // Clicking outside the study area must not silently clamp or move the endpoint.
     const endpoints = await evaluate('document.getElementById("routeEndpoints").textContent');
     await evaluate('document.getElementById("selectRouteB").click();map.fire("click",{latlng:L.latLng(0,0)});void 0;');
     assert.equal(await evaluate('document.getElementById("routeEndpoints").textContent'), endpoints);
-    assert.ok((await evaluate('document.getElementById("routeStatus").textContent')).includes('área de interesse'));
+    assert.ok((await evaluate('document.getElementById("routeStatus").textContent')).includes('area of interest'));
     await evaluate('document.getElementById("selectRouteB").click()');
 
     // Restore the example route, then inspect the exported object without downloading.
     await evaluate('document.getElementById("selectRouteB").click();map.fire("click",{latlng:L.latLng(-4.68,137.42)});document.getElementById("calculateRoute").click();');
-    await waitUntil('document.getElementById("routeStatus").textContent.includes("Rota calculada")');
+    await waitUntil('document.getElementById("routeStatus").textContent.includes("Route calculated")');
     const exported = await evaluate(`(async () => {
       const originalURL = URL.createObjectURL, originalClick = HTMLAnchorElement.prototype.click;
       let payload;

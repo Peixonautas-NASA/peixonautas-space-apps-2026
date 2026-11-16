@@ -37,15 +37,15 @@ const fs = require('node:fs');
     await call('Runtime.enable'); await call('Page.enable');
     await call('Emulation.setDeviceMetricsOverride', { width: 1500, height: 1000, deviceScaleFactor: 1, mobile: false });
     await call('Page.navigate', { url: 'http://127.0.0.1:7878/' });
-    await waitFor('document.getElementById("routeStatus")?.textContent.includes("Rota calculada")');
+    await waitFor('document.getElementById("routeStatus")?.textContent.includes("Route calculated")');
     assert.equal(await evaluate('document.getElementById("terrainMode").value'), 'auto');
     assert.ok((await evaluate('document.getElementById("terrainSourceInfo").textContent')).includes('30 m'));
     await coordinates([-4.59, 137.44], [-4.85, 137.44]);
-    await waitFor('document.getElementById("routeStatus").textContent.includes("Rota calculada")');
-    assert.ok((await evaluate('document.getElementById("routeMetrics").textContent')).includes('17,5 km'));
+    await waitFor('document.getElementById("routeStatus").textContent.includes("Route calculated")');
+    assert.ok((await evaluate('document.getElementById("routeMetrics").textContent')).includes('17.5 km'));
     console.log('PASS: Gale beyond the original crop, real 30m HRSC and ~17.5 km route');
     await evaluate('document.getElementById("calculateRoute").click()');
-    await waitFor('document.getElementById("routeStatus").textContent.includes("Rota calculada")');
+    await waitFor('document.getElementById("routeStatus").textContent.includes("Route calculated")');
     assert.ok((await evaluate('document.getElementById("terrainSourceInfo").textContent')).includes('cache'));
 
     // Controlled unavailable-corridor fixtures exercise real worker + automatic expansion.
@@ -67,16 +67,16 @@ const fs = require('node:fs');
       };
       document.getElementById('calculateRoute').click();
     })()`);
-    await waitFor('document.getElementById("routeStatus").textContent.includes("Rota calculada")');
+    await waitFor('document.getElementById("routeStatus").textContent.includes("Route calculated")');
     assert.deepEqual(await evaluate('window.testExpansions'), [0, 1, 2]);
     await evaluate('window.fetch=window.originalFetch;delete window.testTerrain;void 0');
     console.log('PASS: NoData barrier triggers attempts 0, 1 and 2; old paths are not reused');
 
     await coordinates([18.65, -133.8], [18.67, -133.78]);
-    await waitFor('document.getElementById("routeStatus").textContent.includes("Rota calculada")');
+    await waitFor('document.getElementById("routeStatus").textContent.includes("Route calculated")');
     const source = await evaluate('document.getElementById("terrainSourceInfo").textContent');
     assert.ok(source.includes('MOLA') && source.includes('463 m'), source);
-    assert.ok((await evaluate('document.getElementById("routeStatus").textContent')).includes('Rota regional'));
+    assert.ok((await evaluate('document.getElementById("routeStatus").textContent')).includes('Regional route'));
     console.log('PASS: real Olympus MOLA, resolution disclosure and regional limitation');
 
     // Export carries the actual provider/selection rather than the old Gale metadata.
@@ -92,19 +92,19 @@ const fs = require('node:fs');
     assert.ok(exported.geometry.coordinates.every(([lon, lat, z]) => lon < -133 && lat > 18 && z > 19000));
 
     await coordinates([0, 20], [12, 32]);
-    await waitFor('document.getElementById("routeStatus").textContent.includes("Rota calculada")');
+    await waitFor('document.getElementById("routeStatus").textContent.includes("Route calculated")');
     const coarseSource = await evaluate('document.getElementById("terrainSourceInfo").textContent');
-    assert.ok(coarseSource.includes('16 px') && coarseSource.includes('3.704'), coarseSource);
+    assert.ok(coarseSource.includes('16 px') && coarseSource.includes('3,704'), coarseSource);
     console.log('PASS: ~1000 km itinerary uses native MOLA 16ppd and discloses the coarser grid');
 
     // Unsupported coordinates return a visible error and invalidate the old export.
     await coordinates([0, 179], [0, -179]);
-    await waitFor('document.getElementById("routeStatus").textContent.includes("antimeridiano")');
+    await waitFor('document.getElementById("routeStatus").textContent.includes("antimeridian")');
     assert.equal(await evaluate('document.getElementById("exportRoute").disabled'), true);
     assert.equal(await evaluate('document.getElementById("routeMetrics").textContent'), '');
     await evaluate('document.getElementById("terrainMode").value="local";document.getElementById("terrainMode").dispatchEvent(new Event("change"));');
     await coordinates([-4.59, 137.44], [-4.68, 137.42]);
-    await waitFor('document.getElementById("routeStatus").textContent.includes("Rota calculada")');
+    await waitFor('document.getElementById("routeStatus").textContent.includes("Route calculated")');
     assert.equal(errors.length, 0, JSON.stringify(errors));
     console.log('PASS: planetary export, explicit unsupported-region error and return to local Gale');
     if (process.env.TERRAIN_SCREENSHOT) {

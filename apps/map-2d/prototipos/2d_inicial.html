@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en-US">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Peixonautas — Martian Survival Map (MVP)</title>
+  <title>Red Route — Martian Map (Early Prototype)</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     body { margin: 0; font-family: system-ui, sans-serif; display: flex; height: 100vh; background: #0d1117; color: #e6edf3; }
@@ -19,25 +19,25 @@
 </head>
 <body>
   <div id="sidebar">
-    <h2>Martian Survival Map</h2>
+    <h2>Red Route — Martian Map</h2>
 
     <div class="card">
-      <strong>Ir para Coordenada</strong>
+      <strong>Go to Coordinates</strong>
       <input type="number" id="latInput" step="0.01" value="18.40" placeholder="Latitude (ex: 18.40)" />
       <input type="number" id="lonInput" step="0.01" value="77.50" placeholder="Longitude (ex: 77.50)" />
-      <button onclick="goToCoordinates()">Explorar Ponto</button>
+      <button onclick="goToCoordinates()">Explore Point</button>
     </div>
 
     <div class="card" id="telemetryPanel">
-      <strong>Telemetria da Posição</strong>
-      <p id="coordDisplay">Coordenada: 18.40°N, 77.50°E (Jezero Crater)</p>
+      <strong>Position Telemetry</strong>
+      <p id="coordDisplay">Coordinates: 18.40°N, 77.50°E (Jezero Crater)</p>
       <hr style="border-color:#30363d" />
-      <p><strong>Relevo e Declividade:</strong> <span id="terrainData">Planície deltaica (~2.5° inclinação)</span><br/>
-         <span class="badge">Observação Orbital (MOLA / HiRISE)</span></p>
-      <p><strong>Água / Minerais Hidratados:</strong> <span id="waterData">Presença de argilas e carbonatos hidratados</span><br/>
-         <span class="badge">Observação Orbital (CRISM)</span></p>
-      <p><strong>Clima e Atmosfera:</strong> <span id="climateData">-60°C a -20°C | Vento ~5 m/s | Pressão ~730 Pa</span><br/>
-         <span class="badge">Medição Local Rover (Perseverance MEDA)</span></p>
+      <p><strong>Terrain and Slope:</strong> <span id="terrainData">Delta plain (~2.5° slope)</span><br/>
+         <span class="badge">Orbital Observation (MOLA / HiRISE)</span></p>
+      <p><strong>Water / Hydrated Minerals:</strong> <span id="waterData">Hydrated clays and carbonates present</span><br/>
+         <span class="badge">Orbital Observation (CRISM)</span></p>
+      <p><strong>Weather and Atmosphere:</strong> <span id="climateData">-60°C to -20°C | Wind ~5 m/s | Pressure ~730 Pa</span><br/>
+         <span class="badge">Local Rover Measurement (Perseverance MEDA)</span></p>
     </div>
   </div>
 
@@ -71,25 +71,25 @@
 
     // Controle para alternar camadas na interface
     L.control.layers(
-      { "Superfície Óptica / Relevo": marsOpticalBase },
-      { "Minerais Hidratados (CRISM)": waterMineralsLayer, "Temperatura de Superfície (THEMIS)": thermalLayer }
+      { "Optical Surface / Terrain": marsOpticalBase },
+      { "Hydrated Minerals (CRISM)": waterMineralsLayer, "Surface Temperature (THEMIS)": thermalLayer }
     ).addTo(map);
 
     // Marcador da posição selecionada
     let currentMarker = L.marker([18.4, 77.5]).addTo(map)
-      .bindPopup("Ponto candidato: Cratera Jezero").openPopup();
+      .bindPopup("Candidate point: Jezero Crater").openPopup();
 
     // Base local de referência (expandir com GeoJSON da equipe)
     function updateTelemetry(lat, lon) {
-      document.getElementById('coordDisplay').innerText = `Coordenada: ${lat.toFixed(2)}°, ${lon.toFixed(2)}°`;
+      document.getElementById('coordDisplay').innerText = `Coordinates: ${lat.toFixed(2)}°, ${lon.toFixed(2)}°`;
       
       // Exemplo de diferenciação científica: perto de Jezero (18.4, 77.5) há dados reais do MEDA; fora, usa estimativa
       const isNearJezero = Math.abs(lat - 18.4) < 2 && Math.abs(lon - 77.5) < 2;
       
       if (isNearJezero) {
-        document.getElementById('climateData').innerHTML = `-60°C a -20°C | Vento ~5 m/s | Poeira moderada<br/><span class="badge">Medição Local Rover (MEDA)</span>`;
+        document.getElementById('climateData').innerHTML = `-60°C to -20°C | Wind ~5 m/s | Moderate dust<br/><span class="badge">Local Rover Measurement (MEDA)</span>`;
       } else {
-        document.getElementById('climateData').innerHTML = `-75°C a -15°C | Estimativa latitudinal<br/><span class="badge sim">Estimativa / Modelo Climático</span>`;
+        document.getElementById('climateData').innerHTML = `-75°C to -15°C | Latitude-based estimate<br/><span class="badge sim">Estimate / Climate Model</span>`;
       }
     }
 
@@ -97,7 +97,7 @@
       const lat = parseFloat(document.getElementById('latInput').value);
       const lon = parseFloat(document.getElementById('lonInput').value);
       if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-        alert("Insira coordenadas válidas (Lat: -90 a 90, Lon: -180 a 180).");
+        alert("Enter valid coordinates (Lat: -90 to 90, Lon: -180 to 180).");
         return;
       }
       map.flyTo([lat, lon], 7);
@@ -110,7 +110,7 @@
       const { lat, lng } = e.latlng;
       document.getElementById('latInput').value = lat.toFixed(2);
       document.getElementById('lonInput').value = lng.toFixed(2);
-      currentMarker.setLatLng([lat, lng]).setPopupContent(`Inspeção: ${lat.toFixed(2)}°, ${lng.toFixed(2)}°`).openPopup();
+      currentMarker.setLatLng([lat, lng]).setPopupContent(`Inspection: ${lat.toFixed(2)}°, ${lng.toFixed(2)}°`).openPopup();
       updateTelemetry(lat, lng);
     });
   </script>

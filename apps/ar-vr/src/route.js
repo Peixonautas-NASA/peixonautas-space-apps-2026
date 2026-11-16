@@ -56,7 +56,7 @@ function makeLabel(text) {
   return sprite;
 }
 
-export function buildRoute(terrain, pts2d, destName = 'Destino') {
+export function buildRoute(terrain, pts2d, destName = 'Destination') {
   const group = new THREE.Group();
   const path = densify(pts2d, 1.0);
   const total = path[path.length - 1].d;

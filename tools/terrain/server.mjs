@@ -43,17 +43,17 @@ export function createTerrainServer({ root = fileURLToPath(new URL('../../', imp
         const chunks = []; let length = 0;
         for await (const chunk of request) {
           length += chunk.length;
-          if (length > 4096) { json(request, response, 413, { error: 'Requisição grande demais.' }); return; }
+          if (length > 4096) { json(request, response, 413, { error: 'Request too large.' }); return; }
           chunks.push(chunk);
         }
         let input;
         try { input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
-        catch { json(request, response, 400, { error: 'JSON inválido.' }); return; }
+        catch { json(request, response, 400, { error: 'Invalid JSON.' }); return; }
         const result = await terrain.getTerrain(input);
         if (!response.destroyed) json(request, response, 200, result);
         return;
       }
-      if (url.pathname.startsWith('/api/')) { json(request, response, 404, { error: 'Endpoint desconhecido.' }); return; }
+      if (url.pathname.startsWith('/api/')) { json(request, response, 404, { error: 'Unknown endpoint.' }); return; }
       if (request.method !== 'GET' && request.method !== 'HEAD') { response.writeHead(405).end(); return; }
       let relative = decodeURIComponent(url.pathname);
       if (relative === '/') { response.writeHead(302, { Location: '/apps/map-2d/index.html' }).end(); return; }
@@ -75,7 +75,7 @@ export function createTerrainServer({ root = fileURLToPath(new URL('../../', imp
     } catch (error) {
       if (response.destroyed || response.headersSent) return;
       const status = error.code === 'ENOENT' ? 404 : error.status || 500;
-      json(request, response, status, { error: status === 500 ? 'Falha interna ao preparar o terreno.' : error.message });
+      json(request, response, status, { error: status === 500 ? 'Internal error preparing terrain.' : error.message });
     }
   });
   server.requestTimeout = 300000;
@@ -84,7 +84,7 @@ export function createTerrainServer({ root = fileURLToPath(new URL('../../', imp
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.TERRAIN_PORT || 7878);
-  if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('TERRAIN_PORT inválida.');
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Invalid TERRAIN_PORT.');
   const server = createTerrainServer();
   server.on('error', error => { console.error(error.message); process.exitCode = 1; });
   server.listen(port, '127.0.0.1', () => console.log(`Terrain service: http://127.0.0.1:${port}/`));

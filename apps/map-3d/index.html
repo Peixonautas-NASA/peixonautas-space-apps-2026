@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en-US">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Peixonautas — Relevo 3D Marciano (Escala Real 1:1)</title>
+  <title>Red Route — Martian 3D Terrain (True Scale 1:1)</title>
   <style>
     body { margin: 0; font-family: system-ui, -apple-system, sans-serif; display: flex; height: 100vh; background: #0d1117; color: #e6edf3; overflow: hidden; }
     #sidebar { width: 355px; padding: 16px; background: #161b22; border-right: 1px solid #30363d; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; z-index: 10; }
@@ -37,63 +37,63 @@
 <body>
   <div id="sidebar">
     <div>
-      <h2>Relevo 3D Marciano (1:1)</h2>
-      <div class="subtitle">Altimetria MOLA + Malha Float32</div>
+      <h2>Red Route — Martian 3D Terrain (1:1)</h2>
+      <div class="subtitle">MOLA Elevation + Float32 Mesh</div>
     </div>
 
     <div class="card">
-      <strong>Navegar para Coordenada</strong>
-      <label>Latitude (-85 a 85):</label>
+      <strong>Navigate to Coordinates</strong>
+      <label>Latitude (-85 to 85):</label>
       <input type="number" id="latInput" step="0.01" value="18.40" />
-      <label>Longitude (-180 a 180):</label>
+      <label>Longitude (-180 to 180):</label>
       <input type="number" id="lonInput" step="0.01" value="77.50" />
-      <button onclick="jumpToInput()">Centralizar Ponto</button>
+      <button onclick="jumpToInput()">Center on Point</button>
 
-      <button class="preset-btn" onclick="jumpTo(18.40, 77.50, 90)">Cratera Jezero (Área Candidata)</button>
-      <button class="preset-btn" onclick="jumpTo(-13.90, -59.20, 420)">Valles Marineris (Cânion)</button>
-      <button class="preset-btn" onclick="jumpTo(18.65, -133.80, 680)">Olympus Mons (Vulcão)</button>
-      <button class="preset-btn" onclick="jumpTo(-4.59, 137.44, 130)">Cratera Gale (Monte Sharp)</button>
-      <div id="status">Use o scroll para aproximar e aumentar a resolução.</div>
+      <button class="preset-btn" onclick="jumpTo(18.40, 77.50, 90)">Jezero Crater (Candidate Area)</button>
+      <button class="preset-btn" onclick="jumpTo(-13.90, -59.20, 420)">Valles Marineris (Canyon)</button>
+      <button class="preset-btn" onclick="jumpTo(18.65, -133.80, 680)">Olympus Mons (Volcano)</button>
+      <button class="preset-btn" onclick="jumpTo(-4.59, 137.44, 130)">Gale Crater (Mount Sharp)</button>
+      <div id="status">Scroll to zoom in and increase resolution.</div>
     </div>
 
     <div class="card">
-      <strong>DEM Local Opcional (USGS / HiRISE DTM)</strong>
-      <label>Importar recorte DEM (PNG/JPG escala de cinza):</label>
+      <strong>Optional Local DEM (USGS / HiRISE DTM)</strong>
+      <label>Import DEM crop (grayscale PNG/JPG):</label>
       <input type="file" id="customDemInput" accept="image/png,image/jpeg,image/webp" />
-      <button class="preset-btn" id="clearCustomDemBtn" style="display:none;" onclick="clearCustomDem()">Voltar para Relevo Orbital</button>
+      <button class="preset-btn" id="clearCustomDemBtn" style="display:none;" onclick="clearCustomDem()">Return to Orbital Terrain</button>
     </div>
 
     <div class="card">
-      <strong>Escala Vertical, Suavização e Sol</strong>
-      <label>Fator Vertical: <span id="dispVal">1.0x (Real 1:1)</span></label>
+      <strong>Vertical Scale, Smoothing and Sun</strong>
+      <label>Vertical Factor: <span id="dispVal">1.0x (True Scale 1:1)</span></label>
       <input type="range" id="dispSlider" min="0.5" max="5" step="0.1" value="1.0" />
-      <button class="real-btn" onclick="resetRealScale()">Resetar para Escala Real (1.0x)</button>
+      <button class="real-btn" onclick="resetRealScale()">Reset to True Scale (1.0x)</button>
 
-      <label>Suavização Gaussiana: <span id="smoothVal">5 px</span></label>
+      <label>Gaussian Smoothing: <span id="smoothVal">5 px</span></label>
       <input type="range" id="smoothSlider" min="1" max="15" step="1" value="5" />
 
-      <label>Ganho do Normal Map: <span id="normVal">1.0</span></label>
+      <label>Normal Map Strength: <span id="normVal">1.0</span></label>
       <input type="range" id="normSlider" min="0" max="3.0" step="0.1" value="1.0" />
 
-      <label>Azimute Solar: <span id="sunAzVal">45°</span></label>
+      <label>Solar Azimuth: <span id="sunAzVal">45°</span></label>
       <input type="range" id="sunAzSlider" min="0" max="360" step="1" value="45" />
 
-      <label>Elevação Solar: <span id="sunElVal">28°</span></label>
+      <label>Solar Elevation: <span id="sunElVal">28°</span></label>
       <input type="range" id="sunElSlider" min="5" max="85" step="1" value="28" />
 
-      <div id="sourceBadge" class="badge fallback">DEM MOLA MEGDR 16 px/° (~3,7 km/px); interpolado</div>
+      <div id="sourceBadge" class="badge fallback">MOLA MEGDR DEM 16 px/° (~3.7 km/px); interpolated</div>
     </div>
 
     <div class="card">
-      <strong>Mapas Gerados no Plano 2D</strong>
+      <strong>Generated 2D Maps</strong>
       <div class="preview-row">
         <div class="preview-box">
           <canvas id="colorPreview" width="110" height="110"></canvas>
-          <div>Cor (Viking)</div>
+          <div>Color (Viking)</div>
         </div>
         <div class="preview-box">
           <canvas id="heightPreview" width="110" height="110"></canvas>
-          <div>Elevação</div>
+          <div>Elevation</div>
         </div>
         <div class="preview-box">
           <canvas id="normalPreview" width="110" height="110"></canvas>
@@ -105,11 +105,11 @@
 
   <div id="canvasContainer">
     <div id="hudOverlay">
-      <div><strong>Foco:</strong> <span id="hudCoords">18.40°N, 77.50°E</span></div>
-      <div><strong>Malha Visível:</strong> <span id="hudSpan">-- km × -- km</span></div>
-      <div><strong>Elevação Est. no Centro:</strong> <span id="hudElev">-- km</span></div>
-      <div><strong>Nível LOD (WMTS):</strong> Zoom <span id="hudZoom">6</span> / 12</div>
-      <div><strong>Fonte Topográfica:</strong> <span id="hudSource">DEM MOLA MEGDR (carregando)</span></div>
+      <div><strong>Focus:</strong> <span id="hudCoords">18.40°N, 77.50°E</span></div>
+      <div><strong>Visible Mesh:</strong> <span id="hudSpan">-- km × -- km</span></div>
+      <div><strong>Estimated Center Elevation:</strong> <span id="hudElev">-- km</span></div>
+      <div><strong>LOD Level (WMTS):</strong> Zoom <span id="hudZoom">6</span> / 12</div>
+      <div><strong>Topographic Source:</strong> <span id="hudSource">MOLA MEGDR DEM (loading)</span></div>
     </div>
   </div>
 
@@ -269,7 +269,7 @@
 
     function rebuildCurrentTerrainMaps() {
       const exag = getVerticalExag();
-      document.getElementById('dispVal').innerText = exag === 1.0 ? '1.0x (Real 1:1)' : `${exag.toFixed(1)}x`;
+      document.getElementById('dispVal').innerText = exag === 1.0 ? '1.0x (True Scale 1:1)' : `${exag.toFixed(1)}x`;
 
       const worldDispKm = exag * MOLA_SPAN_KM;
       const sourceCanvas = customDemCanvas || lastElevCanvas;
@@ -341,7 +341,7 @@
           const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
           const buffer = await new Response(stream).arrayBuffer();
           if (buffer.byteLength !== MOLA_WIDTH * MOLA_HEIGHT * 2) {
-            throw new Error('Tamanho invalido do DEM MOLA');
+            throw new Error('Invalid MOLA DEM size');
           }
           return new DataView(buffer);
         })().catch(error => { molaPromise = null; throw error; });
@@ -621,7 +621,7 @@
       currentZoomLevel = z;
       const reqId = ++loadRequestId;
 
-      document.getElementById('status').innerText = `Atualizando malha Float32 para Zoom ${z}...`;
+      document.getElementById('status').innerText = `Updating Float32 mesh for Zoom ${z}...`;
 
       const tileSize = 256;
       const canvasSize = tileSize * 3;
@@ -685,7 +685,7 @@
       } catch (error) {
         if (reqId !== loadRequestId) return;
         lastLoadedKey = '';
-        document.getElementById('status').innerText = 'Falha ao carregar o DEM MOLA. ' + error.message;
+        document.getElementById('status').innerText = 'Failed to load the MOLA DEM. ' + error.message;
         return;
       }
       if (reqId !== loadRequestId) return;
@@ -783,15 +783,15 @@
 
       if (customDemCanvas) {
         badge.className = 'badge dem';
-        badge.innerText = 'DEM Local Importado (Escala de Cinza Direta)';
-        hudSource.innerText = 'DEM Local + Viking/HiRISE';
+        badge.innerText = 'Imported Local DEM (Direct Grayscale)';
+        hudSource.innerText = 'Local DEM + Viking/HiRISE';
       } else {
         badge.className = 'badge dem';
-        badge.innerText = 'DEM MOLA MEGDR 16 px/° (~3,7 km/px); interpolado';
+        badge.innerText = 'MOLA MEGDR DEM 16 px/° (~3.7 km/px); interpolated';
         hudSource.innerText = `MOLA MEGDR 16 px/° + ${hiriseWeight > 0 ? 'HiRISE' : 'Viking'} (Zoom ${z})`;
       }
 
-      document.getElementById('status').innerText = `✅ Malha contínua atualizada (Zoom ${z}).`;
+      document.getElementById('status').innerText = `✅ Continuous mesh updated (Zoom ${z}).`;
     }
 
     document.getElementById('customDemInput').addEventListener('change', (e) => {
@@ -848,7 +848,7 @@
       const lat = parseFloat(document.getElementById('latInput').value);
       const lon = parseFloat(document.getElementById('lonInput').value);
       if (isNaN(lat) || isNaN(lon) || lat < -85 || lat > 85 || lon < -180 || lon > 180) {
-        alert('Insira coordenadas válidas (Lat: -85 a 85, Lon: -180 a 180).');
+        alert('Enter valid coordinates (Lat: -85 to 85, Lon: -180 to 180).');
         return;
       }
       jumpTo(lat, lon, 110);

@@ -71,7 +71,7 @@ const unproject = (x, y) => ({ lat: projection.originLatDeg + y / radiusM / rad,
 const nw = unproject(originX, originY), se = unproject(originX + width * sx, originY - height * sx);
 const centerLat = (nw.lat + se.lat) / 2;
 const data = {
-  id: 'gale-hrsc-curiosity-30m-v1', name: 'Gale — região do Curiosity e sopé do Monte Sharp',
+  id: 'gale-hrsc-curiosity-30m-v1', name: 'Gale — Curiosity region and Mount Sharp foothills',
   width, height, pixelSizeM: sx, originX, originY, projection,
   stepXM: sx * Math.cos(centerLat * rad) / Math.cos(projection.standardParallelDeg * rad), stepYM: sx,
   bounds: { latMin: se.lat, latMax: nw.lat, lonMin: nw.lon, lonMax: se.lon },

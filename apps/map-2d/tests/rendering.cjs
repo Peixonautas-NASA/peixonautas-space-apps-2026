@@ -22,7 +22,7 @@
  await evaluate('tesDust.addTo(map);void 0');await wait(2000);
  const dust=await evaluate('({zoom:tesDust._tileZoom,urls:Object.values(tesDust._tiles).map(t=>t.el.src),status:statusState.tesDust})');
  assert.equal(dust.zoom,1);assert.ok(dust.urls.every(url=>url.includes('/1/')));console.log('TES',dust);
- await evaluate('map.removeLayer(vikingColor);map.removeLayer(jezeroHiRise);map.removeLayer(tesDust);molaColor.addTo(map);document.getElementById("colorModeSelect").value="thermal-false";applyColorMode();');
+ await evaluate('map.removeLayer(vikingColor);map.removeLayer(jezeroHiRise);map.removeLayer(galeHiRise);map.removeLayer(tesDust);molaColor.addTo(map);document.getElementById("colorModeSelect").value="thermal-false";applyColorMode();');
  await wait(2000);
  assert.equal(await evaluate('Object.keys(statusState).join(",")'),'molaColor');
  assert.equal(await evaluate('document.getElementById("molaLegend").hidden'),false);
@@ -34,9 +34,9 @@
  // Force an actual network failure, then recover.
  await call('Network.setBlockedURLs',{urls:['*Mars_MGS_MOLA_ClrShade_merge_global_463m*']});
  await evaluate('molaColor.redraw();void 0');await wait(2000);
- const failure=await evaluate('statusState.molaColor');assert.ok(failure.includes('Falha'));console.log('blocked network',failure);
+ const failure=await evaluate('statusState.molaColor');assert.ok(failure.includes('Failed'));console.log('blocked network',failure);
  await call('Network.setBlockedURLs',{urls:[]});await evaluate('molaColor.redraw();void 0');
- for(let n=0;n<60;n++){if((await evaluate('statusState.molaColor')).includes('?'))break;await wait(500);}
+ for(let n=0;n<60;n++){if((await evaluate('statusState.molaColor')).includes('✅'))break;await wait(500);}
  console.log('recovery',await evaluate('statusState.molaColor'));
  assert.ok((await evaluate('statusState.molaColor')).includes('✅'));
  await evaluate('map.removeLayer(molaColor);vikingColor.addTo(map);void 0');await wait(1200);

@@ -43,11 +43,11 @@ export class LookControls {
 
   /** Precisa ser chamado dentro de um gesto do usuário (clique) por causa do iOS. */
   async enableSensors() {
-    if (!('DeviceOrientationEvent' in window)) throw new Error('Este navegador não expõe DeviceOrientationEvent.');
-    if (!window.isSecureContext) throw new Error('Os sensores exigem HTTPS. Veja o README.');
+    if (!('DeviceOrientationEvent' in window)) throw new Error('This browser does not expose DeviceOrientationEvent.');
+    if (!window.isSecureContext) throw new Error('Sensors require HTTPS. See the README.');
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
       const res = await DeviceOrientationEvent.requestPermission(); // iOS 13+
-      if (res !== 'granted') throw new Error('Permissão negada para os sensores de movimento.');
+      if (res !== 'granted') throw new Error('Motion sensor permission denied.');
     }
     window.addEventListener('deviceorientation', this._onOrientation);
     // Confirma que chegam eventos com dados reais (desktop costuma mandar null).
@@ -62,7 +62,7 @@ export class LookControls {
     });
     if (!ok) {
       window.removeEventListener('deviceorientation', this._onOrientation);
-      throw new Error('Nenhum dado de orientação recebido. Use arrastar para olhar em volta.');
+      throw new Error('No orientation data received. Drag to look around.');
     }
     return true;
   }

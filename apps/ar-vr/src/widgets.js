@@ -48,7 +48,7 @@ function niceStep(x) {
   const m = x / p;
   return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
 }
-const fmtDist = (m) => (m >= 1000 ? `${(m / 1000).toFixed(m >= 10000 ? 0 : 1).replace('.', ',')} km` : `${Math.round(m)} m`);
+const fmtDist = (m) => (m >= 1000 ? `${(m / 1000).toFixed(m >= 10000 ? 0 : 1)} km` : `${Math.round(m)} m`);
 const dirFrom = (az, el, out = new THREE.Vector3()) =>
   out.set(-Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el));
 const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -265,8 +265,8 @@ class SpatialWidget {
 // ---------- Mapa 2D: minimapa visto de cima, centrado no astronauta ----------
 export class Map2DWidget extends SpatialWidget {
   constructor() {
-    super('map2d', 'Mapa 2D');
-    this.subtitle = 'norte para cima';
+    super('map2d', '2D Map');
+    this.subtitle = 'north up';
     this.bg = null; // detalhe em volta da rota (HiRISE em Jezero)
     this.wide = null; // em volta do astronauta, quando ele sai da área da rota
     this._wideAt = 0;
@@ -361,7 +361,7 @@ export class Map2DWidget extends SpatialWidget {
       ctx.font = '500 18px system-ui, sans-serif';
       ctx.fillStyle = 'rgba(220, 240, 255, 0.7)';
       ctx.textAlign = 'center';
-      ctx.fillText('baixando tiles do NASA Trek…', cx, r.y + 30);
+      ctx.fillText('downloading NASA Trek tiles…', cx, r.y + 30);
     }
     // anéis de distância
     const ring = niceStep(this.viewR / 2.2);
@@ -466,7 +466,7 @@ export class Map2DWidget extends SpatialWidget {
     ctx.fillText('N', r.x + r.w - 26, r.y + 27);
 
     // rodapé
-    const txt = `percorrido ${fmtDist(Math.min(progress, total))}  ·  faltam ${fmtDist(Math.max(0, total - progress))}`;
+    const txt = `traveled ${fmtDist(Math.min(progress, total))}  ·  remaining ${fmtDist(Math.max(0, total - progress))}`;
     ctx.font = '500 19px system-ui, sans-serif';
     const tw = ctx.measureText(txt).width;
     ctx.fillStyle = 'rgba(8, 14, 22, 0.72)';
@@ -496,8 +496,8 @@ export class Map2DWidget extends SpatialWidget {
 // ---------- Mapa 3D: maquete holográfica que gira ao arrastar ----------
 export class Map3DWidget extends SpatialWidget {
   constructor(renderer) {
-    super('map3d', 'Mapa 3D');
-    this.subtitle = 'arraste para girar';
+    super('map3d', '3D Map');
+    this.subtitle = 'drag to rotate';
     this.contentDrag = 'orbit';
     this.renderer = renderer;
     this.orbitYaw = 0;
@@ -595,7 +595,7 @@ export class Map3DWidget extends SpatialWidget {
     const token = (this._token = (this._token || 0) + 1);
     this._building = true;
     this._builtAt = performance.now();
-    if (!this.grid) this.source = 'baixando tiles do NASA Trek…';
+    if (!this.grid) this.source = 'downloading NASA Trek tiles…';
     let img;
     try {
       // Textura: mesma receita do apps/map-3d (Viking + HiRISE por luminosidade em Jezero), tiles reais
@@ -619,7 +619,7 @@ export class Map3DWidget extends SpatialWidget {
     const k = 1 / (2 * half); // m -> unidades da maquete (1 x 1)
     const relief = Math.max(0.5, g.max - g.min);
     this.vex = Math.max(1, Math.min(12, (0.16 * 2 * half) / relief)); // exagero vertical automático
-    this.subtitle = `arraste para girar · relevo ${this.vex < 1.05 ? 'real 1:1' : `${this.vex.toFixed(1).replace('.', ',')}x`}`;
+    this.subtitle = `drag to rotate · terrain ${this.vex < 1.05 ? 'true scale 1:1' : `${this.vex.toFixed(1)}x`}`;
     const ky = k * this.vex;
     this.grid = { ...g, k, ky };
 

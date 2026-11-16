@@ -16,7 +16,7 @@ export class RangeCache {
   }
   async get(url, start, end) {
     if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || end < start
-        || end - start > 16 * 1024 * 1024) throw new Error('Intervalo de leitura inválido.');
+        || end - start > 16 * 1024 * 1024) throw new Error('Invalid read range.');
     const key = createHash('sha256').update(`${url}|${start}|${end}`).digest('hex');
     if (this.pending.has(key)) return this.pending.get(key);
     const task = this.read(key, url, start, end).finally(() => this.pending.delete(key));
@@ -37,7 +37,7 @@ export class RangeCache {
     await previous;
     try {
       const bytes = await this.transport(url, start, end);
-      if (bytes.length !== end - start + 1) throw new Error('Resposta parcial com tamanho inválido.');
+      if (bytes.length !== end - start + 1) throw new Error('Partial response has an invalid size.');
       this.downloadedBytes += bytes.length;
       await this.prune(bytes.length);
       const temporary = file + '.' + randomUUID() + '.tmp';
@@ -72,14 +72,14 @@ async function curlRange(url, start, end) {
   let offset = 0, headers;
   do {
     const endOfHeaders = stdout.indexOf('\r\n\r\n', offset);
-    if (endOfHeaders < 0) throw new Error('Servidor remoto sem cabeçalho HTTP válido.');
+    if (endOfHeaders < 0) throw new Error('Remote server returned no valid HTTP header.');
     headers = stdout.subarray(offset, endOfHeaders).toString('ascii');
     offset = endOfHeaders + 4;
   } while (stdout.subarray(offset, offset + 5).toString('ascii') === 'HTTP/');
   const status = Number(headers.match(/^HTTP\/\S+\s+(\d+)/)?.[1]);
   const range = headers.match(/content-range:\s*bytes\s+(\d+)-(\d+)\/(\d+)/i);
   if (status !== 206 || !range || Number(range[1]) !== start || Number(range[2]) !== end) {
-    throw new Error('A fonte não confirmou o intervalo solicitado.');
+    throw new Error('The source did not confirm the requested range.');
   }
   return stdout.subarray(offset);
 }

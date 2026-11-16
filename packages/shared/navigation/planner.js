@@ -19,7 +19,7 @@
         || data.unit !== spec.unit || !spec.quantities.includes(data.quantity)
         || !Number.isInteger(data.width) || !Number.isInteger(data.height) || data.width < 1 || data.height < 1
         || data.width * data.height > 250000 || !Array.isArray(data.values) || data.values.length !== data.width * data.height) {
-      throw new Error('Grade ambiental inválida: verifique planeta, grandeza, unidade e dimensões.');
+      throw new Error('Invalid environmental grid: check planet, quantity, unit and dimensions.');
     }
     const b = data.bounds, s = data.source;
     if (!b || ![b.latMin, b.latMax, b.lonMin, b.lonMax].every(Number.isFinite)
@@ -29,12 +29,12 @@
         || typeof s.temporalContext !== 'string' || !s.temporalContext.trim() || s.temporalContext.length > 200
         || !Number.isFinite(s.resolutionM) || s.resolutionM <= 0
         || typeof s.url !== 'string' || (s.url && !/^https?:\/\//i.test(s.url))) {
-      throw new Error('A grade precisa de cobertura e procedência declarada: fonte, data/período, resolução e referência de superfície.');
+      throw new Error('The grid requires declared coverage and provenance: source, date/period, resolution and surface reference.');
     }
     const values = data.values.map(value => {
       if (value === null) return null;
       if (!Number.isFinite(value) || Math.abs(value) > 1e12 || (field === 'temperature' ? value < -273.15 : value < 0)) {
-        throw new Error('Valor ambiental inválido. Use números na unidade declarada ou null para ausência de dados.');
+        throw new Error('Invalid environmental value. Use numbers in the declared unit or null for missing data.');
       }
       return value;
     });
@@ -50,7 +50,7 @@
     if (![p.speedMps, p.doseReferenceUSv, p.temperatureReferenceC, p.magneticReferenceNT].every(v => Number.isFinite(v) && v >= 0.001)
         || p.speedMps > 1000 || ![p.temperatureMinC, p.temperatureMaxC, p.magneticLimitNT].every(Number.isFinite)
         || p.temperatureMinC < -273.15 || p.temperatureMaxC < p.temperatureMinC || p.magneticLimitNT < 0) {
-      throw new Error('Revise velocidade, referências ambientais e faixa de temperatura.');
+      throw new Error('Check speed, environmental references and temperature range.');
     }
     const layers = {};
     for (const [field, spec] of Object.entries(ENVIRONMENT_FIELDS)) {
@@ -58,9 +58,9 @@
       const mode = layer.mode || 'off', value = layer.value ?? spec.value;
       if (!['off', 'uniform', 'raster'].includes(mode) || !Number.isFinite(value)
           || (field === 'temperature' ? value < -273.15 : value < 0) || Math.abs(value) > 1e12) {
-        throw new Error('Fonte ou valor do cenário ambiental inválido.');
+        throw new Error('Invalid environmental scenario source or value.');
       }
-      if (mode === 'raster' && !layer.raster) throw new Error('Importe a grade numérica para a camada ambiental selecionada.');
+      if (mode === 'raster' && !layer.raster) throw new Error('Import the numerical grid for the selected environmental layer.');
       layers[field] = { mode, value, raster: layer.raster ? validateEnvironmentRaster(layer.raster, field) : null };
     }
     return { speedMps: p.speedMps, doseReferenceUSv: p.doseReferenceUSv,
@@ -85,10 +85,10 @@
     const secondsPerM = 1 / config.speedMps;
     for (const field of active) {
       const layer = config.layers[field], spec = ENVIRONMENT_FIELDS[field];
-      if (layer.mode === 'off') throw new Error('Ative uma fonte ou cenário para cada peso ambiental maior que zero.');
+      if (layer.mode === 'off') throw new Error('Enable a source or scenario for each positive environmental weight.');
       const values = new Float64Array(n), penalties = new Float64Array(n);
       let validCells = 0;
-      if (layer.mode === 'raster' && !grid.projection) throw new Error('Grade de terreno sem projeção para alinhar os dados ambientais.');
+      if (layer.mode === 'raster' && !grid.projection) throw new Error('Terrain grid lacks a projection for aligning environmental data.');
       for (let y = 0; y < grid.height; y++) for (let x = 0; x < grid.width; x++) {
         const i = y * grid.width + x;
         const location = layer.mode === 'raster' ? cellToLatLon(grid, { x, y }) : null;
@@ -107,7 +107,7 @@
         (d.bounds.latMax - d.bounds.latMin) * 3396190 * RAD / d.height,
         (d.bounds.lonMax - d.bounds.lonMin) * 3396190 * RAD * Math.cos((d.bounds.latMax + d.bounds.latMin) / 2 * RAD) / d.width) : null;
       layers[field] = { mode: layer.mode, unit: spec.unit, quantity: d?.quantity || spec.quantities[0],
-        source: d?.source || { kind: 'scenario', title: 'Cenário uniforme definido no aplicativo', temporalContext: 'Cenário estático, sem observação atual', reference: 'surface' },
+        source: d?.source || { kind: 'scenario', title: 'Uniform scenario defined in the app', temporalContext: 'Static scenario, no current observation', reference: 'surface' },
         uniformValue: layer.mode === 'uniform' ? layer.value : null, effectiveResolutionM,
         sourceBounds: d?.bounds || null, validCells, missingCells: n - validCells,
         provenance: layer.mode === 'raster' ? 'imported-source-declared-by-user' : 'scenario-not-observation' };
@@ -125,7 +125,7 @@
     if (typeof p.enabled !== 'boolean' || !['allow', 'penalize', 'block'].includes(p.unknownPolicy)
         || ![p.difficultCost, p.unknownCost, p.marginM].every(v => Number.isFinite(v) && v >= 0)
         || p.difficultCost > 100 || p.unknownCost > 100 || p.marginM > 10000) {
-      throw new Error('Revise os custos e a política de transitabilidade.');
+      throw new Error('Check traversability costs and policy.');
     }
     return p;
   }
@@ -150,38 +150,38 @@
   }
 
   function validateAnnotations(areas = []) {
-    if (!Array.isArray(areas) || areas.length > 50) throw new Error('Use no máximo 50 áreas manuais.');
+    if (!Array.isArray(areas) || areas.length > 50) throw new Error('Use at most 50 manual areas.');
     let vertices = 0;
     const ids = new Set();
     return areas.map((area, index) => {
       if (!area || !['blocked', 'difficult', 'normal', 'unknown'].includes(area.type)
-          || !Array.isArray(area.ring)) throw new Error('Classificação ou polígono inválido.');
+          || !Array.isArray(area.ring)) throw new Error('Invalid classification or polygon.');
       const ring = area.ring.map(p => {
         if (!Array.isArray(p) || p.length !== 2 || !p.every(Number.isFinite) || Math.abs(p[0]) > 180 || Math.abs(p[1]) > 75) {
-          throw new Error('Coordenadas inválidas na área manual (longitude, latitude de Marte).');
+          throw new Error('Invalid manual area coordinates (Mars longitude, latitude).');
         }
         return [p[0], p[1]];
       });
       if (ring.length > 1 && ring[0][0] === ring.at(-1)[0] && ring[0][1] === ring.at(-1)[1]) ring.pop();
       vertices += ring.length;
-      if (ring.length < 3 || ring.length > 128 || vertices > 2048) throw new Error('Use 3 a 128 vértices por área e até 2.048 no total.');
-      if (Math.max(...ring.map(p => p[0])) - Math.min(...ring.map(p => p[0])) > 180) throw new Error('Áreas no antimeridiano não são suportadas.');
+      if (ring.length < 3 || ring.length > 128 || vertices > 2048) throw new Error('Use 3 to 128 vertices per area and up to 2,048 in total.');
+      if (Math.max(...ring.map(p => p[0])) - Math.min(...ring.map(p => p[0])) > 180) throw new Error('Areas crossing the antimeridian are not supported.');
       let surface = 0;
       for (let i = 0; i < ring.length; i++) {
         const a = ring[i], b = ring[(i + 1) % ring.length];
-        if (a[0] === b[0] && a[1] === b[1]) throw new Error('Remova vértices repetidos.');
+        if (a[0] === b[0] && a[1] === b[1]) throw new Error('Remove duplicate vertices.');
         surface += a[0] * b[1] - b[0] * a[1];
         for (let j = i + 1; j < ring.length; j++) {
           if (j === i + 1 || (i === 0 && j === ring.length - 1)) continue;
-          if (intersects(a, b, ring[j], ring[(j + 1) % ring.length])) throw new Error('O polígono não pode cruzar a si mesmo.');
+          if (intersects(a, b, ring[j], ring[(j + 1) % ring.length])) throw new Error('The polygon must not intersect itself.');
         }
       }
-      if (Math.abs(surface) < 1e-14) throw new Error('Desenhe uma área com superfície maior que zero.');
+      if (Math.abs(surface) < 1e-14) throw new Error('Draw an area with a surface greater than zero.');
       const id = typeof area.id === 'string' && area.id.trim() ? area.id.trim().slice(0, 80) : 'area-' + index;
-      if (ids.has(id)) throw new Error('Cada área deve ter um identificador único.');
+      if (ids.has(id)) throw new Error('Each area must have a unique identifier.');
       ids.add(id);
       return { id,
-        label: typeof area.label === 'string' ? area.label.slice(0, 80) : 'Área ' + (index + 1),
+        label: typeof area.label === 'string' ? area.label.slice(0, 80) : 'Area ' + (index + 1),
         type: area.type, ring, provenance: 'manual-interpretation',
         createdAt: typeof area.createdAt === 'string' ? area.createdAt.slice(0, 40) : null };
     });
@@ -197,7 +197,7 @@
     if (!grid.projection || ![grid.originX, grid.originY, grid.pixelSizeM, grid.projection.radiusM,
       grid.projection.centralLonDeg, grid.projection.originLatDeg, grid.projection.standardParallelDeg].every(Number.isFinite)
       || grid.pixelSizeM <= 0 || grid.projection.radiusM <= 0 || Math.abs(grid.projection.standardParallelDeg) >= 90) {
-      throw new Error('A camada manual precisa de uma grade com georreferenciamento válido.');
+      throw new Error('The manual layer requires a valid georeferenced grid.');
     }
     const masks = new Uint8Array(n);
     const bits = { normal: 1, unknown: 2, difficult: 4, blocked: 8 };
@@ -285,7 +285,7 @@
           || !Array.from(grid.terrainCostPerM).every(v => Number.isFinite(v) && v >= 0)))
         || (grid.stepXMByRow && (grid.stepXMByRow.length !== grid.height
           || !Array.from(grid.stepXMByRow).every(v => Number.isFinite(v) && v > 0)))) {
-      throw new Error('Grade de terreno inválida.');
+      throw new Error('Invalid terrain grid.');
     }
   }
 
@@ -321,7 +321,7 @@
         || !Number.isFinite(p.terrain) || p.terrain < 0
         || ![p.radiation, p.temperature, p.magnetism].every(v => Number.isFinite(v) && v >= 0 && v <= 1000000)
         || !Number.isFinite(p.maxSlopeDeg) || p.maxSlopeDeg <= 0 || p.maxSlopeDeg >= 90) {
-      throw new Error('Pesos inválidos: distância > 0, demais pesos ≥ 0, limite entre 0° e 90°.');
+      throw new Error('Invalid weights: distance > 0, other weights ≥ 0, limit between 0° and 90°.');
     }
     return p;
   }

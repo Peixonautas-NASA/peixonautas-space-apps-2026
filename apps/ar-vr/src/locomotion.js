@@ -9,9 +9,9 @@ import * as THREE from 'three';
 export const EYE_HEIGHT = 1.7;
 
 export const SPEEDS = [
-  { label: 'Caminhada', v: 1.4 },
+  { label: 'Walking', v: 1.4 },
   { label: 'Rover', v: 15 },
-  { label: 'Rápido', v: 300 },
+  { label: 'Fast', v: 300 },
 ];
 
 export class Walker {

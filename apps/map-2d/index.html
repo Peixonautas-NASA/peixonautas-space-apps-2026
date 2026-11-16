@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en-US">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Peixonautas — Martian Survival Map (Leaflet + NASA Mars Trek)</title>
+  <title>Red Route — Martian Map</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     body { margin: 0; font-family: system-ui, -apple-system, sans-serif; display: flex; height: 100vh; background: #0d1117; color: #e6edf3; }
@@ -60,189 +60,189 @@
 <body>
   <div id="sidebar">
     <div>
-      <h2>Martian Survival Map</h2>
-      <div class="subtitle">NASA Space Apps 2026 — Equipe Peixonautas</div>
+      <h2>Red Route — Martian Map</h2>
+      <div class="subtitle">NASA Space Apps 2026 — Team Peixonautas</div>
     </div>
 
     <div class="card" id="routePanel">
-      <strong>Rotas em Marte — protótipo regional</strong>
-      <label>Fonte do terreno
+      <strong>Mars Routes — Regional Prototype</strong>
+      <label>Terrain source
         <select id="terrainMode">
-          <option value="local">Gale local — HRSC 30 m</option>
-          <option value="auto">Automático — buscar terreno para A/B</option>
+          <option value="local">Local Gale — HRSC 30 m</option>
+          <option value="auto">Automatic — fetch terrain for A/B</option>
         </select>
       </label>
-      <div class="subtitle" id="terrainSourceInfo">Curiosity e sopé do Monte Sharp · DTM HRSC de 30 m</div>
+      <div class="subtitle" id="terrainSourceInfo">Curiosity and Mount Sharp foothills · 30 m HRSC DTM</div>
       <div class="route-controls">
-        <button id="selectRouteA" type="button" aria-pressed="false">Marcar A</button>
-        <button id="selectRouteB" type="button" aria-pressed="false">Marcar B</button>
+        <button id="selectRouteA" type="button" aria-pressed="false">Set A</button>
+        <button id="selectRouteB" type="button" aria-pressed="false">Set B</button>
       </div>
-      <button class="preset-btn" id="focusRouteArea" type="button">Ver área de interesse</button>
+      <button class="preset-btn" id="focusRouteArea" type="button">View area of interest</button>
       <div id="routeEndpoints"></div>
       <details style="margin-top:8px;">
-        <summary>Inserir coordenadas A/B</summary>
+        <summary>Enter A/B coordinates</summary>
         <label>Latitude A <input id="routeLatA" type="number" step="any" min="-75" max="75" value="-4.59" /></label>
         <label>Longitude A <input id="routeLonA" type="number" step="any" min="-180" max="180" value="137.44" /></label>
         <label>Latitude B <input id="routeLatB" type="number" step="any" min="-75" max="75" value="-4.68" /></label>
         <label>Longitude B <input id="routeLonB" type="number" step="any" min="-180" max="180" value="137.42" /></label>
-        <button id="applyRouteCoordinates" class="preset-btn" type="button">Usar estas coordenadas</button>
+        <button id="applyRouteCoordinates" class="preset-btn" type="button">Use these coordinates</button>
       </details>
-      <label>Peso da distância
+      <label>Distance weight
         <input id="weightDistance" type="number" min="0.1" max="100" step="0.1" value="1" />
       </label>
-      <label>Peso da inclinação
+      <label>Slope weight
         <input id="weightSlope" type="number" min="0" max="100" step="0.5" value="3" />
       </label>
-      <label>Peso da subida acumulada
+      <label>Cumulative ascent weight
         <input id="weightAscent" type="number" min="0" max="100" step="0.5" value="5" />
       </label>
-      <label>Inclinação máxima da grade (graus)
+      <label>Maximum grid slope (degrees)
         <input id="routeMaxSlope" type="number" min="1" max="60" step="1" value="25" />
       </label>
       <details id="traversabilityEditor">
-        <summary>Transitabilidade manual</summary>
-        <label><input id="useTraversability" type="checkbox" />Usar áreas manuais no cálculo</label>
-        <p class="subtitle">Interpretação manual, não medição de sensor. Fora das áreas classificadas, o terreno é desconhecido. Nada aqui confirma ausência de obstáculos.</p>
-        <label>Peso da transitabilidade
+        <summary>Manual traversability</summary>
+        <label><input id="useTraversability" type="checkbox" />Use manual areas in route calculation</label>
+        <p class="subtitle">Manual interpretation, not sensor measurements. Terrain outside classified areas is unknown. This does not confirm the absence of obstacles.</p>
+        <label>Traversability weight
           <input id="weightTerrain" type="number" min="0" max="100" step="0.5" value="1" />
         </label>
-        <label>Custo adicional por metro em terreno difícil
+        <label>Additional cost per meter of difficult terrain
           <input id="difficultCost" type="number" min="0" max="100" step="0.5" value="3" />
         </label>
-        <label>Terreno desconhecido
+        <label>Unknown terrain
           <select id="unknownPolicy">
-            <option value="penalize">Penalizar</option>
-            <option value="allow">Permitir sem custo adicional</option>
-            <option value="block">Bloquear</option>
+            <option value="penalize">Penalize</option>
+            <option value="allow">Allow without additional cost</option>
+            <option value="block">Block</option>
           </select>
         </label>
-        <label>Custo adicional por metro desconhecido
+        <label>Additional cost per meter of unknown terrain
           <input id="unknownCost" type="number" min="0" max="100" step="0.5" value="1" />
         </label>
-        <label>Margem das áreas classificadas Bloqueada (m)
+        <label>Blocked-area margin (m)
           <input id="blockedMargin" type="number" min="0" max="10000" step="1" value="60" />
         </label>
-        <p class="subtitle">A margem e as células tocadas são bloqueadas de forma conservadora. Em grades grosseiras, o desvio pode ser muito maior que a área desenhada.</p>
-        <label>Classificação da nova área
+        <p class="subtitle">The margin and intersected cells are conservatively blocked. On coarse grids, detours may be much larger than the drawn area.</p>
+        <label>New area classification
           <select id="annotationType">
-            <option value="blocked">Bloqueada — vermelho</option>
-            <option value="difficult">Difícil — laranja</option>
-            <option value="normal">Normal — verde</option>
-            <option value="unknown">Desconhecida — amarelo</option>
+            <option value="blocked">Blocked — red</option>
+            <option value="difficult">Difficult — orange</option>
+            <option value="normal">Normal — green</option>
+            <option value="unknown">Unknown — yellow</option>
           </select>
         </label>
-        <label>Nome da área (opcional)
-          <input id="annotationLabel" type="text" maxlength="80" placeholder="Ex.: dunas interpretadas em imagem" />
+        <label>Area name (optional)
+          <input id="annotationLabel" type="text" maxlength="80" placeholder="E.g., dunes identified in imagery" />
         </label>
-        <button id="drawAnnotation" type="button" class="preset-btn" aria-pressed="false">Desenhar área no mapa</button>
+        <button id="drawAnnotation" type="button" class="preset-btn" aria-pressed="false">Draw area on map</button>
         <div class="route-controls">
-          <button id="finishAnnotation" type="button" disabled>Concluir área</button>
-          <button id="undoAnnotationVertex" type="button" class="preset-btn" disabled>Desfazer vértice</button>
-          <button id="cancelAnnotation" type="button" class="preset-btn" disabled>Cancelar</button>
+          <button id="finishAnnotation" type="button" disabled>Finish area</button>
+          <button id="undoAnnotationVertex" type="button" class="preset-btn" disabled>Undo vertex</button>
+          <button id="cancelAnnotation" type="button" class="preset-btn" disabled>Cancel</button>
         </div>
-        <div id="annotationStatus" role="status" aria-live="polite">Nenhuma área manual.</div>
+        <div id="annotationStatus" role="status" aria-live="polite">No manual areas.</div>
         <ul id="annotationList"></ul>
-        <button id="exportAnnotations" type="button" class="preset-btn">Exportar áreas e política</button>
-        <label>Importar áreas de Marte (substitui as atuais)
+        <button id="exportAnnotations" type="button" class="preset-btn">Export areas and policy</button>
+        <label>Import Mars areas (replaces current areas)
           <input id="importAnnotations" type="file" accept=".json,.geojson,application/json,application/geo+json" />
         </label>
       </details>
       <details id="environmentEditor">
-        <summary>Radiação, temperatura e magnetismo</summary>
-        <p class="subtitle">Critérios experimentais. Use grades numéricas de superfície com procedência declarada, ou cenários de simulação. Nenhuma medição atual é buscada automaticamente. Campo magnético não é convertido em proteção contra radiação.</p>
-        <label>Velocidade horizontal assumida (m/s)
+        <summary>Radiation, temperature and magnetism</summary>
+        <p class="subtitle">Experimental criteria. Use numerical surface grids with declared provenance or simulation scenarios. No current measurements are fetched automatically. Magnetic fields are not converted into radiation protection.</p>
+        <label>Assumed horizontal speed (m/s)
           <input id="environmentSpeed" type="number" min="0.001" max="1000" step="any" value="1" />
         </label>
-        <label>Dose de referência para o custo (µSv; não é limite de saúde)
+        <label>Cost reference dose (µSv; not a health limit)
           <input id="environmentDoseReference" type="number" min="0.001" step="any" value="100" />
         </label>
-        <label>Faixa térmica de referência — mínimo (°C)
+        <label>Reference temperature range — minimum (°C)
           <input id="environmentTemperatureMin" type="number" min="-273.15" step="any" value="-80" />
         </label>
-        <label>Faixa térmica de referência — máximo (°C)
+        <label>Reference temperature range — maximum (°C)
           <input id="environmentTemperatureMax" type="number" min="-273.15" step="any" value="-20" />
         </label>
-        <label>Desvio térmico de referência (°C)
+        <label>Reference temperature deviation (°C)
           <input id="environmentTemperatureReference" type="number" min="0.001" step="any" value="20" />
         </label>
-        <label>Penalizar magnitude magnética acima de (nT)
+        <label>Penalize magnetic field magnitude above (nT)
           <input id="environmentMagneticLimit" type="number" min="0" step="any" value="1000" />
         </label>
-        <label>Excesso magnético de referência (nT)
+        <label>Reference magnetic field excess (nT)
           <input id="environmentMagneticReference" type="number" min="0.001" step="any" value="1000" />
         </label>
         <div id="environmentLayers"></div>
-        <div id="environmentStatus" role="status" aria-live="polite">Pesos ambientais desligados por padrão.</div>
-        <button id="resetEnvironment" type="button" class="preset-btn">Desligar os três pesos ambientais</button>
-        <button id="exportEnvironment" type="button" class="preset-btn">Exportar configuração e grades</button>
-        <label>Importar configuração ambiental (substitui a atual)
+        <div id="environmentStatus" role="status" aria-live="polite">Environmental weights are off by default.</div>
+        <button id="resetEnvironment" type="button" class="preset-btn">Turn off all three environmental weights</button>
+        <button id="exportEnvironment" type="button" class="preset-btn">Export configuration and grids</button>
+        <label>Import environmental configuration (replaces current configuration)
           <input id="importEnvironment" type="file" accept=".json,application/json" />
         </label>
-        <p class="subtitle">Grades importadas ficam apenas nesta sessão; exporte para preservá-las. Campos são estáticos e usam velocidade constante. Grades grosseiras não ganham precisão ao serem alinhadas ao DTM. Temperatura de superfície e do ar são grandezas distintas.</p>
+        <p class="subtitle">Imported grids are kept only for this session; export them to save them. Fields are static and use constant speed. Coarse grids do not gain accuracy when aligned to the DTM. Surface and air temperature are different quantities.</p>
       </details>
-      <button id="calculateRoute" type="button">Calcular rota A → B</button>
-      <button class="preset-btn" id="exportRoute" type="button" disabled>Exportar GeoJSON</button>
-      <div id="routeStatus" role="status" aria-live="polite">Preparando terreno...</div>
+      <button id="calculateRoute" type="button">Calculate route A → B</button>
+      <button class="preset-btn" id="exportRoute" type="button" disabled>Export GeoJSON</button>
+      <div id="routeStatus" role="status" aria-live="polite">Preparing terrain...</div>
       <div id="routeMetrics"></div>
-      <p class="subtitle">Pesos e limite são hipóteses ajustáveis do protótipo. Áreas manuais entram somente quando ativadas; não há classificação automática de solo ou clima no custo. A resolução escolhida limita o detalhe das inclinações e dos obstáculos; não é validação de segurança operacional.</p>
-      <a id="terrainSourceLink" href="https://zenodo.org/records/5808354" target="_blank" rel="noopener noreferrer">Fonte do terreno</a>
+      <p class="subtitle">Weights and limits are adjustable prototype assumptions. Manual areas apply only when enabled; soil and weather are not automatically classified in the cost. The selected resolution limits slope and obstacle detail; this is not operational safety validation.</p>
+      <a id="terrainSourceLink" href="https://zenodo.org/records/5808354" target="_blank" rel="noopener noreferrer">Terrain source</a>
     </div>
 
     <div class="card">
-      <strong>Modo de Cor e Realce Visual</strong>
+      <strong>Color Mode and Visual Enhancement</strong>
       <select id="colorModeSelect" onchange="applyColorMode()">
-        <option value="natural" selected>Cores Originais da NASA (Viking / MOLA)</option>
-        <option value="ochre-tint">Realce Ocre Marciano (Colorizar HiRISE / P&B)</option>
-        <option value="thermal-false">Falsa Cor de Alto Contraste</option>
+        <option value="natural" selected>Original NASA Colors (Viking / MOLA)</option>
+        <option value="ochre-tint">Martian Ochre Enhancement (Tint HiRISE / Grayscale)</option>
+        <option value="thermal-false">High-Contrast False Color</option>
       </select>
       <div id="colorModeNote" class="subtitle" style="margin-top:6px;">
-        Exibe as camadas oficiais (Viking Color, altimetria MOLA e P&B) sem filtros adicionais.
+        Displays official layers (Viking Color, MOLA elevation and grayscale) without additional filters.
       </div>
       <div id="molaLegend" hidden>
       <div class="legend-bar"></div>
       <div class="legend-labels">
-        <span>Baixa altitude (MOLA)</span>
-        <span>Planície</span>
-        <span>Alta altitude</span>
+        <span>Low elevation (MOLA)</span>
+        <span>Plain</span>
+        <span>High elevation</span>
       </div>
-      <div class="subtitle">Legenda qualitativa MOLA; imagem colorida com sombreado, sem leitura numérica de altitude.</div>
+      <div class="subtitle">Qualitative MOLA legend; color-shaded imagery, without numerical elevation readout.</div>
       </div>
     </div>
 
     <div class="card">
-      <strong>Navegar por Coordenada</strong>
-      <input type="number" id="latInput" step="0.01" value="18.40" placeholder="Latitude (-90 a 90)" />
-      <input type="number" id="lonInput" step="0.01" value="77.50" placeholder="Longitude (-180 a 180)" />
-      <button onclick="goToCoordinates()">Ir para Coordenada</button>
-      <button class="preset-btn" onclick="jumpPreset(18.40, 77.50, 9)">Focar Cratera Jezero (HiRISE)</button>
-      <button class="preset-btn" onclick="jumpPreset(-4.59, 137.44, 7)">Focar Cratera Gale (Curiosity)</button>
-      <button class="preset-btn" onclick="jumpPreset(18.65, -133.8, 4)">Focar Olympus Mons (Relevo)</button>
+      <strong>Navigate to Coordinates</strong>
+      <input type="number" id="latInput" step="0.01" value="18.40" placeholder="Latitude (-90 to 90)" />
+      <input type="number" id="lonInput" step="0.01" value="77.50" placeholder="Longitude (-180 to 180)" />
+      <button onclick="goToCoordinates()">Go to Coordinates</button>
+      <button class="preset-btn" onclick="jumpPreset(18.40, 77.50, 9)">Focus Jezero Crater (HiRISE)</button>
+      <button class="preset-btn" onclick="jumpPreset(-4.59, 137.44, 7)">Focus Gale Crater (Curiosity)</button>
+      <button class="preset-btn" onclick="jumpPreset(18.65, -133.8, 4)">Focus Olympus Mons (Terrain)</button>
     </div>
 
     <div class="card" id="telemetryPanel">
-      <strong>Telemetria e Sobrevivência</strong>
-      <p id="coordDisplay">Coordenada: 18.40°N, 77.50°E</p>
+      <strong>Telemetry and Survival</strong>
+      <p id="coordDisplay">Coordinates: 18.40°N, 77.50°E</p>
       <hr style="border-color:#30363d" />
       <p>
-        <strong>Relevo e Declividade:</strong><br/>
-        <span id="terrainData">Piso da Cratera Jezero — delta fluvial e planície adjacente</span><br/>
-        <span class="badge">Observação Orbital (MOLA / CTX / HiRISE)</span>
+        <strong>Terrain and Slope:</strong><br/>
+        <span id="terrainData">Jezero Crater floor — river delta and adjacent plain</span><br/>
+        <span class="badge">Orbital Observation (MOLA / CTX / HiRISE)</span>
       </p>
       <p>
-        <strong>Água / Minerais Hidratados:</strong><br/>
-        <span id="waterData">Argilas e carbonatos hidratados identificados em bordas do delta (CRISM)</span><br/>
-        <span class="badge">Observação Orbital (MRO CRISM)</span>
+        <strong>Water / Hydrated Minerals:</strong><br/>
+        <span id="waterData">Hydrated clays and carbonates identified along delta margins (CRISM)</span><br/>
+        <span class="badge">Orbital Observation (MRO CRISM)</span>
       </p>
       <p>
-        <strong>Clima e Atmosfera:</strong><br/>
-        <span id="climateData">-60°C a -20°C | Vento ~5 m/s | Pressão ~730 Pa</span><br/>
-        <span id="climateBadge" class="badge rover">Medição Local Rover (Perseverance MEDA)</span>
+        <strong>Weather and Atmosphere:</strong><br/>
+        <span id="climateData">-60°C to -20°C | Wind ~5 m/s | Pressure ~730 Pa</span><br/>
+        <span id="climateBadge" class="badge rover">Local Rover Measurement (Perseverance MEDA)</span>
       </p>
     </div>
 
     <div class="card">
-      <strong>Status das Camadas Ativas</strong>
-      <div id="layerStatus">Aguardando tiles...</div>
+      <strong>Active Layer Status</strong>
+      <div id="layerStatus">Waiting for tiles...</div>
     </div>
   </div>
 
@@ -266,7 +266,7 @@
       const lines = Object.values(statusState);
       document.getElementById('layerStatus').innerHTML = lines.length
         ? lines.map(line => '<div>' + line + '</div>').join('')
-        : 'Nenhuma camada ativa.';
+        : 'No active layers.';
     }
 
     function createDirectTrekLayer(key, label, urls, options = {}) {
@@ -305,13 +305,13 @@
         }
         const note = options.note ? ' (' + options.note + ')' : '';
         const enlarged = map.getZoom() > layer.options.maxNativeZoom
-          ? ' — ampliada, sem detalhe adicional' : '';
+          ? ' — enlarged, no additional detail' : '';
         let text;
-        if (!view.intersects(coverage)) text = 'ℹ️ Fora da cobertura';
-        else if (failed) text = loaded ? '⚠️ Cobertura parcial: ' + loaded + ' tiles, ' + failed + ' falhas' : '⚠️ Falha ao carregar tiles';
-        else if (pending) text = '⏳ Carregando';
-        else if (loaded) text = '✅ Carregada';
-        else text = '⏳ Aguardando tiles';
+        if (!view.intersects(coverage)) text = 'ℹ️ Outside coverage';
+        else if (failed) text = loaded ? '⚠️ Partial coverage: ' + loaded + ' tiles, ' + failed + ' failures' : '⚠️ Failed to load tiles';
+        else if (pending) text = '⏳ Loading';
+        else if (loaded) text = '✅ Loaded';
+        else text = '⏳ Waiting for tiles';
         statusState[key] = text + ': <b>' + label + '</b>' + note + enlarged;
         renderLayerStatuses();
       }
@@ -341,7 +341,7 @@
     // 1. CAMADAS BASE OFICIAIS (NASA Mars Trek)
     const vikingColor = createDirectTrekLayer(
       'vikingColor',
-      'Superfície Colorida (Viking 232m)',
+      'Color Surface (Viking 232m)',
       [
         'https://trek.nasa.gov/tiles/Mars/EQ/Mars_Viking_MDIM21_ClrMosaic_global_232m/1.0.0/default/default028mm/{z}/{y}/{x}.jpg'
       ],
@@ -350,7 +350,7 @@
 
     const molaColor = createDirectTrekLayer(
       'molaColor',
-      'Altimetria Colorida (MOLA 463m)',
+      'Color Elevation (MOLA 463m)',
       [
         'https://trek.nasa.gov/tiles/Mars/EQ/Mars_MGS_MOLA_ClrShade_merge_global_463m/1.0.0/default/default028mm/{z}/{y}/{x}.jpg'
       ],
@@ -359,7 +359,7 @@
 
     const molaGray = createDirectTrekLayer(
       'molaGray',
-      'Relevo Sombreado P&B (MOLA 463m)',
+      'Grayscale Hillshade (MOLA 463m)',
       [
         'https://trek.nasa.gov/tiles/Mars/EQ/Mars_MGS_MOLA_ClrShade_merge_global_463m/1.0.0/default/default028mm/{z}/{y}/{x}.jpg'
       ],
@@ -373,7 +373,7 @@
 
     const vikingGray = createDirectTrekLayer(
       'vikingGray',
-      'Óptico Global (Viking Grayscale)',
+      'Global Optical (Viking Grayscale)',
       [
         'https://trek.nasa.gov/tiles/Mars/EQ/Mars_Viking_MDIM21_ClrMosaic_global_232m/1.0.0/default/default028mm/{z}/{y}/{x}.jpg'
       ],
@@ -387,7 +387,7 @@
 
     const themisDayIR = createDirectTrekLayer(
       'themisIR',
-      'Térmico Diurno (THEMIS IR)',
+      'Daytime Thermal (THEMIS IR)',
       [
         'https://trek.nasa.gov/tiles/Mars/EQ/THEMIS_DayIR_ControlledMosaics_100m_v2_oct2018/1.0.0/default/default028mm/{z}/{y}/{x}.png'
       ],
@@ -401,7 +401,7 @@
     // 2. OVERLAYS DE ALTA RESOLUÇÃO E ATMOSFERA
     const jezeroHiRise = createDirectTrekLayer(
       'hirise',
-      'Alta Resolução Jezero (HiRISE)',
+      'High Resolution Jezero (HiRISE)',
       [
         'https://trek.nasa.gov/tiles/Mars/EQ/NES_JEZ_MID_Visible_Mosaic_HiRISE_CTX_HRSC_GCS_MARS_07-10-2018/1.0.0/default/default028mm/{z}/{y}/{x}.png'
       ],
@@ -415,7 +415,7 @@
 
     const galeHiRise = createDirectTrekLayer(
       'hiriseGale',
-      'Alta Resolução Gale (HiRISE Curiosity)',
+      'High Resolution Gale (HiRISE Curiosity)',
       [
         'https://trek.nasa.gov/tiles/Mars/EQ/curiosity_hirise_mosaic/1.0.0/default/default028mm/{z}/{y}/{x}.png'
       ],
@@ -429,7 +429,7 @@
 
     const tesDust = createDirectTrekLayer(
       'tesDust',
-      'Poeira Atmosférica (TES)',
+      'Atmospheric Dust (TES)',
       [
         'https://trek.nasa.gov/tiles/Mars/EQ/TES_Dust/1.0.0/default/default028mm/{z}/{y}/{x}.png'
       ],
@@ -442,16 +442,16 @@
 
     L.control.layers(
       {
-        "Superfície Colorida (Viking 232m)": vikingColor,
-        "Altimetria Colorida (MOLA 463m)": molaColor,
-        "Relevo Sombreado P&B (MOLA 463m)": molaGray,
-        "Óptico Global (Viking Grayscale)": vikingGray,
-        "Térmico Diurno (THEMIS IR)": themisDayIR
+        "Color Surface (Viking 232m)": vikingColor,
+        "Color Elevation (MOLA 463m)": molaColor,
+        "Grayscale Hillshade (MOLA 463m)": molaGray,
+        "Global Optical (Viking Grayscale)": vikingGray,
+        "Daytime Thermal (THEMIS IR)": themisDayIR
       },
       {
-        "Alta Resolução Jezero (HiRISE)": jezeroHiRise,
-        "Alta Resolução Gale (HiRISE Curiosity)": galeHiRise,
-        "Poeira Atmosférica (TES Dust)": tesDust
+        "High Resolution Jezero (HiRISE)": jezeroHiRise,
+        "High Resolution Gale (HiRISE Curiosity)": galeHiRise,
+        "Atmospheric Dust (TES Dust)": tesDust
       },
       { collapsed: false }
     ).addTo(map);
@@ -469,44 +469,44 @@
       document.getElementById('molaLegend').hidden = !map.hasLayer(molaColor);
       const noteEl = document.getElementById('colorModeNote');
       if (mode === 'natural') {
-        noteEl.innerText = 'Exibe as imagens originais, sem realces adicionais.';
+        noteEl.innerText = 'Displays original imagery without additional enhancements.';
       } else {
         noteEl.innerText = (mode === 'ochre-tint'
-          ? 'Realce ocre aplicado às imagens ópticas; não representa cor natural medida.'
-          : 'Falsa cor aplicada às imagens ópticas; não representa temperatura.')
-          + ' As paletas MOLA, TES e THEMIS são preservadas.';
+          ? 'Ochre enhancement applied to optical imagery; does not represent measured natural color.'
+          : 'False color applied to optical imagery; does not represent temperature.')
+          + ' MOLA, TES and THEMIS palettes are preserved.';
       }
     }
     map.on('layeradd layerremove', applyColorMode);
     applyColorMode();
 
     let currentMarker = L.marker([18.4, 77.5]).addTo(map)
-      .bindPopup("<b>Cratera Jezero (Área Candidata)</b><br/>18.40°N, 77.50°E").openPopup();
+      .bindPopup("<b>Jezero Crater (Candidate Area)</b><br/>18.40°N, 77.50°E").openPopup();
 
     function updateTelemetry(lat, lon) {
-      document.getElementById('coordDisplay').innerText = `Coordenada: ${lat.toFixed(2)}°, ${lon.toFixed(2)}°`;
+      document.getElementById('coordDisplay').innerText = `Coordinates: ${lat.toFixed(2)}°, ${lon.toFixed(2)}°`;
 
       const isNearJezero = Math.abs(lat - 18.4) < 1.5 && Math.abs(lon - 77.5) < 1.5;
       const isNearGale = Math.abs(lat - (-4.59)) < 1.5 && Math.abs(lon - 137.44) < 1.5;
 
       if (isNearJezero) {
-        document.getElementById('terrainData').innerText = "Piso da Cratera Jezero — delta fluvial e planície adjacente";
-        document.getElementById('waterData').innerText = "Argilas e carbonatos hidratados identificados em bordas do delta (CRISM)";
-        document.getElementById('climateData').innerText = "-60°C a -20°C | Vento ~5 m/s | Pressão ~730 Pa";
+        document.getElementById('terrainData').innerText = "Jezero Crater floor — river delta and adjacent plain";
+        document.getElementById('waterData').innerText = "Hydrated clays and carbonates identified along delta margins (CRISM)";
+        document.getElementById('climateData').innerText = "-60°C to -20°C | Wind ~5 m/s | Pressure ~730 Pa";
         document.getElementById('climateBadge').className = "badge rover";
-        document.getElementById('climateBadge').innerText = "Medição Local Rover (Perseverance MEDA)";
+        document.getElementById('climateBadge').innerText = "Local Rover Measurement (Perseverance MEDA)";
       } else if (isNearGale) {
-        document.getElementById('terrainData').innerText = "Cratera Gale / Base do Monte Sharp — terrenos estratificados";
-        document.getElementById('waterData').innerText = "Sulfatos hidratados e antigos depósitos lacustres (CRISM / Curiosity)";
-        document.getElementById('climateData').innerText = "-65°C a -10°C | Radiação monitorada pelo sensor RAD";
+        document.getElementById('terrainData').innerText = "Gale Crater / Mount Sharp Base — layered terrain";
+        document.getElementById('waterData').innerText = "Hydrated sulfates and ancient lake deposits (CRISM / Curiosity)";
+        document.getElementById('climateData').innerText = "-65°C to -10°C | Radiation monitored by RAD";
         document.getElementById('climateBadge').className = "badge rover";
-        document.getElementById('climateBadge').innerText = "Medição Local Rover (Curiosity REMS / RAD)";
+        document.getElementById('climateBadge').innerText = "Local Rover Measurement (Curiosity REMS / RAD)";
       } else {
-        document.getElementById('terrainData').innerText = "Inspeção orbital global — verificar inclinação local em escala CTX/HiRISE";
-        document.getElementById('waterData').innerText = "Sem faixa espectral local carregada — consultar cobertura CRISM/GRS";
-        document.getElementById('climateData').innerText = "Sem estação meteorológica ativa neste ponto — faixa térmica estimada";
+        document.getElementById('terrainData').innerText = "Global orbital inspection — check local slope at CTX/HiRISE scale";
+        document.getElementById('waterData').innerText = "No local spectral band loaded — consult CRISM/GRS coverage";
+        document.getElementById('climateData').innerText = "No active weather station at this location — estimated temperature range";
         document.getElementById('climateBadge').className = "badge sim";
-        document.getElementById('climateBadge').innerText = "Estimativa / Modelo Climático (Sem sensor local)";
+        document.getElementById('climateBadge').innerText = "Estimate / Climate Model (No Local Sensor)";
       }
     }
 
@@ -514,11 +514,11 @@
       const lat = parseFloat(document.getElementById('latInput').value);
       const lon = parseFloat(document.getElementById('lonInput').value);
       if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-        alert("Insira coordenadas válidas (Latitude: -90 a 90, Longitude: -180 a 180).");
+        alert("Enter valid coordinates (Latitude: -90 to 90, Longitude: -180 to 180).");
         return;
       }
       map.flyTo([lat, lon], Math.max(map.getZoom(), 7));
-      currentMarker.setLatLng([lat, lon]).setPopupContent(`<b>Ponto Selecionado</b><br/>${lat.toFixed(2)}°, ${lon.toFixed(2)}°`).openPopup();
+      currentMarker.setLatLng([lat, lon]).setPopupContent(`<b>Selected Point</b><br/>${lat.toFixed(2)}°, ${lon.toFixed(2)}°`).openPopup();
       updateTelemetry(lat, lon);
     }
 
@@ -526,7 +526,7 @@
       document.getElementById('latInput').value = lat.toFixed(2);
       document.getElementById('lonInput').value = lon.toFixed(2);
       map.flyTo([lat, lon], zoomLevel);
-      currentMarker.setLatLng([lat, lon]).setPopupContent(`<b>Alvo de Referência</b><br/>${lat.toFixed(2)}°, ${lon.toFixed(2)}°`).openPopup();
+      currentMarker.setLatLng([lat, lon]).setPopupContent(`<b>Reference Target</b><br/>${lat.toFixed(2)}°, ${lon.toFixed(2)}°`).openPopup();
       updateTelemetry(lat, lon);
     }
 
@@ -535,7 +535,7 @@
       const { lat, lng } = e.latlng;
       document.getElementById('latInput').value = lat.toFixed(2);
       document.getElementById('lonInput').value = lng.toFixed(2);
-      currentMarker.setLatLng([lat, lng]).setPopupContent(`<b>Inspeção Manual</b><br/>${lat.toFixed(2)}°, ${lng.toFixed(2)}°`).openPopup();
+      currentMarker.setLatLng([lat, lng]).setPopupContent(`<b>Manual Inspection</b><br/>${lat.toFixed(2)}°, ${lng.toFixed(2)}°`).openPopup();
       updateTelemetry(lat, lng);
     });
   </script>
