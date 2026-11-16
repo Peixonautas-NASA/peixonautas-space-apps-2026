@@ -119,8 +119,9 @@ function makeCanvas(size) {
  * mosaico Viking MDIM 2.1 e, onde houver cobertura (Jezero, Gale), o mosaico HiRISE por cima.
  * Cada camada é baixada no zoom NATIVO que corresponde à resolução pedida (Viking até z7, HiRISE
  * até z17) e desenhada pela posição real dos tiles, sem "zoom esticado" de tile único.
- *  - hirise: 'map2d' = como no apps/map-2d (sobreposto, opacidade 0,9);
- *            'map3d' = como no apps/map-3d (mistura de luminosidade, 0,88).
+ *  - hi-res orbital mosaics are overlaid where available (Jezero HiRISE or Curiosity HiRISE/CTX);
+ *  - hirise: 'map2d' = image overlay (opacidade 0,9);
+ *            'map3d' = mistura de luminosidade (0,88).
  */
 export async function composeRegionImage(
   world,

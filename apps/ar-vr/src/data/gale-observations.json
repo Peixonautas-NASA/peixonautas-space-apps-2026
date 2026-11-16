@@ -1,0 +1,43 @@
+{
+  "source": {
+    "rems": "NASA PDS Atmospheres Node, MSL REMS MODRDR; daily min/mean/max summaries",
+    "remsUrl": "https://atmos.nmsu.edu/data_and_services/atmospheres_data/MARS/curiosity/rems.html",
+    "rad": "NASA PDS PPI, MSL-M-RAD-3-RDR-V1.0; E-detector mean dose rate multiplied by 24 h",
+    "radUrl": "https://pds-ppi.igpp.ucla.edu/data/MSL-M-RAD-3-RDR-V1.0/",
+    "coordinates": "NASA/JPL MSL MMGIS waypoints; rover position for the matching sol",
+    "coordinatesUrl": "https://mars.nasa.gov/mmgis-maps/MSL/Layers/json/MSL_waypoints.json"
+  },
+  "maxDisplayDistanceM": 160,
+  "observations": [
+    {
+      "sol": 22, "lat": -4.58940312, "lon": 137.4418925,
+      "rems": { "airTempC": { "min": -74.87, "mean": -49.87, "max": -5.74 }, "pressurePa": { "min": 688.88, "mean": 744.2, "max": 787.66 }, "humidityPct": { "min": 0.89, "mean": 4.59, "max": 21.34 } },
+      "rad": { "meanMicroGyPerDay": 215.49, "observations": 47 }
+    },
+    {
+      "sol": 40, "lat": -4.59003646, "lon": 137.4441777,
+      "rems": { "airTempC": { "min": -75.34, "mean": -44.0, "max": -11.41 }, "pressurePa": { "min": 699.12, "mean": 746.3, "max": 804.53 }, "humidityPct": { "min": 0.72, "mean": 3.33, "max": 19.14 } },
+      "rad": { "meanMicroGyPerDay": 224.49, "observations": 45 }
+    },
+    {
+      "sol": 57, "lat": -4.59001956, "lon": 137.4483392,
+      "rems": { "airTempC": { "min": -75.37, "mean": -33.71, "max": -2.29 }, "pressurePa": { "min": 720.19, "mean": 749.82, "max": 812.1 }, "humidityPct": { "min": 0.45, "mean": 2.47, "max": 15.11 } },
+      "rad": { "meanMicroGyPerDay": 209.61, "observations": 45 }
+    },
+    {
+      "sol": 100, "lat": -4.59002152, "lon": 137.4483102,
+      "rems": { "airTempC": { "min": -66.76, "mean": -35.67, "max": -0.5 }, "pressurePa": { "min": 771.4, "mean": 821.15, "max": 866.11 }, "humidityPct": { "min": 0.34, "mean": 1.84, "max": 6.08 } },
+      "rad": { "meanMicroGyPerDay": 210.53, "observations": 43 }
+    },
+    {
+      "sol": 121, "lat": -4.59028132, "lon": 137.4491076,
+      "rems": { "airTempC": { "min": -66.67, "mean": -35.39, "max": -0.43 }, "pressurePa": { "min": 808.28, "mean": 865.11, "max": 916.63 }, "humidityPct": { "min": 0.47, "mean": 2.1, "max": 8.41 } },
+      "rad": { "meanMicroGyPerDay": 215.97, "observations": 45 }
+    },
+    {
+      "sol": 159, "lat": -4.58953451, "lon": 137.4492382,
+      "rems": { "airTempC": { "min": -68.01, "mean": -47.05, "max": -4.94 }, "pressurePa": { "min": 858.92, "mean": 920.36, "max": 958.18 }, "humidityPct": { "min": 0.49, "mean": 3.33, "max": 8.99 } },
+      "rad": { "meanMicroGyPerDay": 215.0, "observations": 44 }
+    }
+  ]
+}

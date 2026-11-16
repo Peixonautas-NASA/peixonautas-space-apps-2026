@@ -273,10 +273,60 @@ export class Map2DWidget extends SpatialWidget {
     this.viewR = 0;
     this.nav = null;
     this._timer = 1;
+    this.dataLayer = 'base';
+    this.telemetryStops = [];
+    this.sampleSites = [];
+    this.currentStop = null;
+    this.currentSample = null;
+    this.observations = [];
+    this.currentObservation = null;
+    this.observationRadiusM = 160;
+    this.dataTabs = [
+      { id: 'base', label: 'BASE', color: '#d4e3ed' },
+      { id: 'radiation', label: 'RAD', color: '#ffb020' },
+      { id: 'climate', label: 'CLIMA', color: '#61d9ff' },
+      { id: 'minerals', label: 'MINERAIS', color: '#d797ff' },
+    ];
   }
 
-  rebuild(world, path) {
+  // Taps on the small thematic controls are handled as selections; the rest of the map can be dragged.
+  regionAt(uv) {
+    const region = super.regionAt(uv);
+    if (region !== 'content') return region;
+    const px = uv.x * CW;
+    const py = (1 - uv.y) * CH;
+    const y = CONTENT.y + 8;
+    if (py < y || py > y + 34) return region;
+    const x = CONTENT.x + 8;
+    const gap = 6;
+    const tabW = (CONTENT.w - 16 - gap * 3) / 4;
+    const i = Math.floor((px - x) / (tabW + gap));
+    if (i < 0 || i >= this.dataTabs.length) return region;
+    const left = x + i * (tabW + gap);
+    return px <= left + tabW ? 'layer' : region;
+  }
+
+  layerAt(uv) {
+    const px = uv.x * CW;
+    const x = CONTENT.x + 8;
+    const gap = 6;
+    const tabW = (CONTENT.w - 16 - gap * 3) / 4;
+    const i = Math.max(0, Math.min(3, Math.floor((px - x) / (tabW + gap))));
+    return this.dataTabs[i].id;
+  }
+
+  setDataLayer(id) {
+    if (!this.dataTabs.some((tab) => tab.id === id)) return;
+    this.dataLayer = id;
+    this.redraw();
+  }
+
+  rebuild(world, path, telemetry = [], sampleSites = [], observations = [], observationRadiusM = 160) {
     this.world = world;
+    this.telemetryStops = telemetry.map((p) => ({ ...p, ...world.toWorld(p.lat, p.lon) }));
+    this.sampleSites = sampleSites.map((p) => ({ ...p, ...world.toWorld(p.lat, p.lon) }));
+    this.observations = observations.map((p) => ({ ...p, ...world.toWorld(p.lat, p.lon) }));
+    this.observationRadiusM = observationRadiusM;
     const box = routeBox(path);
     // cobre a vista centrada no astronauta em qualquer ponto da rota
     const half = Math.max(600, box.diag * 3.6 + 200); // painel largo: sobra dos lados
@@ -293,6 +343,34 @@ export class Map2DWidget extends SpatialWidget {
 
   tick(dt, nav) {
     this.nav = nav;
+    if (this.telemetryStops.length) {
+      let nearest = null;
+      let nearestD2 = Infinity;
+      for (const stop of this.telemetryStops) {
+        const dx = stop.x - nav.pos.x;
+        const dz = stop.z - nav.pos.z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 < nearestD2) {
+          nearest = stop;
+          nearestD2 = d2;
+        }
+      }
+      this.currentStop = nearest;
+      this.currentSample = this.sampleSites
+        .map((sample) => ({ ...sample, distance: Math.hypot(sample.x - nav.pos.x, sample.z - nav.pos.z) }))
+        .filter((sample) => sample.distance <= 25)
+        .sort((a, b) => a.distance - b.distance)[0] ?? null;
+      this.currentObservation = this.observations
+        .map((observation) => ({ ...observation, distance: Math.hypot(observation.x - nav.pos.x, observation.z - nav.pos.z) }))
+        .sort((a, b) => a.distance - b.distance)[0] ?? null;
+      if (this.currentObservation?.distance > this.observationRadiusM) this.currentObservation = null;
+      this.subtitle = nearest ? `NASA · sol ${nearest.sol}` : 'norte para cima';
+    } else {
+      this.currentStop = null;
+      this.currentSample = null;
+      this.currentObservation = null;
+      this.subtitle = 'norte para cima';
+    }
     if ((this._timer += dt) < 0.1) return; // ~10 quadros por segundo bastam para o minimapa
     this._timer = 0;
     this._followAstronaut(nav.pos);
@@ -426,6 +504,38 @@ export class Map2DWidget extends SpatialWidget {
     ctx.fill();
 
     // astronauta: campo de visão + seta na direção do olhar
+    for (const sample of this.sampleSites) {
+      const [mx, my] = S(sample.x, sample.z);
+      ctx.save();
+      ctx.fillStyle = 'rgba(5, 12, 19, 0.88)';
+      ctx.strokeStyle = '#d797ff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(mx, my, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#f0d7ff';
+      ctx.font = '600 13px system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Rocknest', mx + 11, my);
+      ctx.restore();
+    }
+
+    for (const observation of (this.dataLayer === 'radiation' || this.dataLayer === 'climate' ? this.observations : [])) {
+      const [mx, my] = S(observation.x, observation.z);
+      const color = this.dataLayer === 'radiation' ? '#ffb020' : '#61d9ff';
+      ctx.save();
+      ctx.fillStyle = 'rgba(5, 12, 19, 0.9)';
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(mx, my, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
     const dx = -Math.sin(yaw);
     const dz = -Math.cos(yaw);
     const ang = Math.atan2(dz, dx);
@@ -465,6 +575,8 @@ export class Map2DWidget extends SpatialWidget {
     ctx.textBaseline = 'middle';
     ctx.fillText('N', r.x + r.w - 26, r.y + 27);
 
+    this.drawDataLayer(ctx, r);
+
     // rodapé
     const txt = `traveled ${fmtDist(Math.min(progress, total))}  ·  remaining ${fmtDist(Math.max(0, total - progress))}`;
     ctx.font = '500 19px system-ui, sans-serif';
@@ -490,6 +602,101 @@ export class Map2DWidget extends SpatialWidget {
     ctx.strokeStyle = 'rgba(200, 240, 255, 0.18)';
     ctx.lineWidth = 1;
     ctx.stroke();
+  }
+
+  drawDataLayer(ctx, r) {
+    const x = r.x + 8;
+    const y = r.y + 8;
+    const gap = 6;
+    const tabW = (r.w - 16 - gap * 3) / 4;
+    const tabH = 34;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '700 14px system-ui, sans-serif';
+    for (let i = 0; i < this.dataTabs.length; i++) {
+      const tab = this.dataTabs[i];
+      const tx = x + i * (tabW + gap);
+      roundRectPath(ctx, tx, y, tabW, tabH, 10);
+      ctx.fillStyle = this.dataLayer === tab.id ? `${tab.color}44` : 'rgba(8, 14, 22, 0.82)';
+      ctx.fill();
+      ctx.strokeStyle = this.dataLayer === tab.id ? tab.color : 'rgba(210, 235, 250, 0.35)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.fillStyle = this.dataLayer === tab.id ? '#ffffff' : 'rgba(235, 245, 255, 0.82)';
+      ctx.fillText(tab.label, tx + tabW / 2, y + tabH / 2);
+    }
+
+    const cards = {
+      radiation: {
+        color: '#ffb020',
+        title: 'RAD · superfície de Marte',
+        lines: [],
+        note: 'NASA/PDS · dose RAD E por sol; ponto de leitura mais próximo',
+      },
+      climate: {
+        color: '#61d9ff',
+        title: 'REMS · clima em Gale',
+        lines: [],
+        note: 'NASA/PDS · resumo diário da estação REMS mais próxima',
+      },
+      minerals: {
+        color: '#d797ff',
+        title: 'CheMin · amostras de Gale',
+        lines: ['Rocknest: plagioclásio, olivina e piroxênios', 'Yellowknife Bay: ~20% argilas na rocha analisada', 'Monte Sharp: hematita, sulfatos e argilas variáveis'],
+        note: 'PONTOS DE AMOSTRAGEM · não é cobertura contínua',
+      },
+    }[this.dataLayer];
+    if (cards && (this.dataLayer === 'radiation' || this.dataLayer === 'climate')) {
+      const obs = this.currentObservation;
+      if (obs && this.dataLayer === 'radiation') {
+        cards.lines = [
+          `Dose RAD (E): ${obs.rad.meanMicroGyPerDay.toFixed(1).replace('.', ',')} µGy/dia`,
+          `Leitura diária agregada · ${obs.rad.observations} observações válidas`,
+          `Sol ${obs.sol} · ponto a ${Math.round(obs.distance)} m do astronauta`,
+        ];
+      } else if (obs && this.dataLayer === 'climate') {
+        cards.lines = [
+          `Ar: ${obs.rems.airTempC.min.toFixed(1)} a ${obs.rems.airTempC.max.toFixed(1)} °C · média ${obs.rems.airTempC.mean.toFixed(1)} °C`,
+          `Pressão: ${obs.rems.pressurePa.min.toFixed(0)}–${obs.rems.pressurePa.max.toFixed(0)} Pa · média ${obs.rems.pressurePa.mean.toFixed(0)} Pa`,
+          `Umidade: ${obs.rems.humidityPct.min.toFixed(1)}–${obs.rems.humidityPct.max.toFixed(1)}% · média ${obs.rems.humidityPct.mean.toFixed(1)}%`,
+          `Sol ${obs.sol} · ponto a ${Math.round(obs.distance)} m do astronauta`,
+        ];
+      } else {
+        cards.lines = ['Sem leitura dentro do raio de 160 m.', 'Os pontos coloridos marcam as medições disponíveis.', 'Não há interpolação entre os registros.'];
+      }
+      cards.note = 'VALOR MEDIDO NO PONTO MAIS PRÓXIMO · NASA/PDS';
+    }
+    if (cards && this.dataLayer === 'minerals') {
+      cards.lines = this.currentSample
+        ? ['Regiao de amostragem Rocknest.', this.currentSample.minerals, `Rover esteve aqui nos sols ${this.currentSample.solRange[0]}–${this.currentSample.solRange[1]}.`]
+        : ['Sem amostra CheMin perto desta posicao.', 'Rocknest esta marcado no mapa.', 'Os minerais so aparecem junto a regiao de amostragem.'];
+      cards.note = 'AMOSTRAGEM LOCAL · regiao aproximada pela posicao Curiosity';
+    }
+    if (cards) {
+      const h = cards.lines.length > 3 ? 127 : 111;
+      const bx = r.x + 12;
+      const by = r.y + r.h - h - 48;
+      const bw = r.w - 24;
+      roundRectPath(ctx, bx, by, bw, h, 12);
+      ctx.fillStyle = 'rgba(5, 12, 19, 0.9)';
+      ctx.fill();
+      ctx.strokeStyle = `${cards.color}bb`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = cards.color;
+      ctx.font = '700 16px system-ui, sans-serif';
+      ctx.fillText(cards.title, bx + 10, by + 8);
+      ctx.fillStyle = '#edf6fc';
+      ctx.font = '500 13px system-ui, sans-serif';
+      cards.lines.forEach((line, i) => ctx.fillText(line, bx + 10, by + 30 + i * 16));
+      ctx.fillStyle = 'rgba(210, 228, 240, 0.72)';
+      ctx.font = '600 10px system-ui, sans-serif';
+      ctx.fillText(cards.note, bx + 10, by + h - 16);
+    }
+    ctx.restore();
   }
 }
 
@@ -895,8 +1102,11 @@ export class WidgetManager {
     if (w) this.setOpen(id, !w.open);
   }
 
-  rebuild(world, path) {
-    for (const w of this.widgets) w.rebuild?.(world, path);
+  rebuild(world, path, telemetry = [], sampleSites = [], observations = [], observationRadiusM = 160) {
+    for (const w of this.widgets) {
+      if (w.id === 'map2d') w.rebuild?.(world, path, telemetry, sampleSites, observations, observationRadiusM);
+      else w.rebuild?.(world, path);
+    }
   }
 
   update(dt, t, nav) {
@@ -919,7 +1129,7 @@ export class WidgetManager {
     for (const hit of this.raycaster.intersectObjects(meshes, false)) {
       const w = hit.object.userData.widget;
       const region = w.regionAt(hit.uv);
-      if (region) return { w, region };
+      if (region) return { w, region, uv: hit.uv.clone() };
     }
     return null;
   }
@@ -951,12 +1161,13 @@ export class WidgetManager {
         e.preventDefault();
         if (this.active) return; // um dedo por vez em widgets
         const { w, region } = hit;
-        const mode = region === 'close' ? 'close' : region === 'content' && w.contentDrag === 'orbit' ? 'orbit' : 'move';
+        const mode = region === 'close' ? 'close' : region === 'layer' ? 'layer' : region === 'content' && w.contentDrag === 'orbit' ? 'orbit' : 'move';
         const ang = this._rayAngles();
         this.active = {
           id: e.pointerId,
           w,
           mode,
+          layerId: mode === 'layer' ? w.layerAt(hit.uv) : null,
           x0: e.clientX,
           y0: e.clientY,
           x: e.clientX,
@@ -1007,6 +1218,11 @@ export class WidgetManager {
         this.setOpen(w.id, false);
         return;
       }
+      if (a.mode === 'layer' && !a.moved && e.type === 'pointerup') {
+        w.setDataLayer(a.layerId);
+        this._endActive();
+        return;
+      }
       if (a.mode === 'move' && a.moved) this.save();
       this._endActive();
     };
@@ -1021,6 +1237,8 @@ export class WidgetManager {
       ? ''
       : hit.region === 'close'
         ? 'pointer'
+        : hit.region === 'layer'
+          ? 'pointer'
         : hit.region === 'content' && hit.w.contentDrag === 'orbit'
           ? 'ew-resize'
           : 'grab';
